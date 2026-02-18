@@ -1,0 +1,32 @@
+{
+  "name": "llmtium-mcp",
+  "version": "0.0.1",
+  "description": "LLMtium MCP server — stdio transport for Claude Code / Cursor",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "llmtium-mcp": "./dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@llmtium/core": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.0"
+  },
+  "files": ["dist"],
+  "license": "MIT"
+}
