@@ -107,7 +107,7 @@ async function runDraftStage(
   const drafts = new Map<string, DraftResult>();
 
   const settled = await Promise.allSettled(
-    config.providers.map((pwc) =>
+    config.providers.map(async (pwc) =>
       pwc.provider.draft(pwc.config, { userPrompt: config.prompt, systemPrompt: config.systemPrompt }),
     ),
   );
@@ -160,7 +160,7 @@ async function runReviewStage(
   }
 
   const settled = await Promise.allSettled(
-    reviewerPwcs.map(({ modelId, pwc }) => {
+    reviewerPwcs.map(async ({ modelId, pwc }) => {
       const ownLabel = modelToLabel.get(modelId);
       const othersResponses = anonymized.filter((r) => r.label !== ownLabel);
       const shuffled = shuffleForReviewer(othersResponses, modelId);
@@ -212,14 +212,14 @@ async function runSynthesisStage(
     review,
   }));
 
-  const { systemPrompt, userPrompt } = config.synthesis.buildPrompt({
-    userPrompt: config.prompt,
-    drafts: anonymized,
-    reviews: reviewEntries,
-  });
-
   let result: ProviderResult<SynthesisResponse>;
   try {
+    const { systemPrompt, userPrompt } = config.synthesis.buildPrompt({
+      userPrompt: config.prompt,
+      drafts: anonymized,
+      reviews: reviewEntries,
+    });
+
     result = await config.synthesizer.provider.structuredOutput<SynthesisResponse>(
       config.synthesizer.config,
       {
