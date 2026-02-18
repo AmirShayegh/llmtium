@@ -20,6 +20,19 @@ export function resetCrypto(): void {
   _keyCache = null;
 }
 
+export function ensureCryptoReady(storage?: KeyStorage): void {
+  if (_storage) return;
+  if (storage) {
+    initCrypto(storage);
+    return;
+  }
+  if (typeof window !== "undefined") {
+    initCrypto(localStorage);
+    return;
+  }
+  throw new Error("crypto not initialized — call initCrypto() first");
+}
+
 function ensureInitialized(): KeyStorage {
   if (!_storage) {
     throw new Error("crypto not initialized — call initCrypto() first");

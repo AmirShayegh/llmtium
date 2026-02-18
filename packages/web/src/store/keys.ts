@@ -1,6 +1,6 @@
 import { createStore } from "zustand/vanilla";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { decrypt } from "@/lib/crypto";
+import { decrypt, ensureCryptoReady } from "@/lib/crypto";
 
 export type KeyStatus = "untested" | "validating" | "valid" | "invalid";
 
@@ -12,7 +12,7 @@ export interface ProviderKeyState {
 
 export interface KeysState {
   providers: Record<string, ProviderKeyState>;
-  setKey: (providerId: string, encryptedKey: string) => void;
+  setEncryptedKey: (providerId: string, encryptedKey: string) => void;
   setStatus: (providerId: string, status: KeyStatus, error?: string) => void;
   removeKey: (providerId: string) => void;
   getKeys: () => Promise<Record<string, string>>;
@@ -42,7 +42,7 @@ export function createKeysStore(storage?: PersistStorage) {
       (set, get) => ({
         providers: makeInitialProviders(),
 
-        setKey: (providerId, encryptedKey) =>
+        setEncryptedKey: (providerId, encryptedKey) =>
           set((state) => ({
             providers: {
               ...state.providers,
@@ -74,6 +74,7 @@ export function createKeysStore(storage?: PersistStorage) {
           })),
 
         getKeys: async () => {
+          ensureCryptoReady();
           const providers = get().providers;
           const result: Record<string, string> = {};
           for (const [id, state] of Object.entries(providers)) {

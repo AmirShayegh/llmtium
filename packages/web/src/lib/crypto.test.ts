@@ -125,4 +125,17 @@ describe("crypto", () => {
       await expect(decrypt("test")).rejects.toThrow(/not initialized/);
     });
   });
+
+  describe("ensureCryptoReady", () => {
+    it("should auto-initialize and work without explicit initCrypto when storage is provided", async () => {
+      const storage = makeStorage();
+      // Use ensureCryptoReady instead of initCrypto — this is the safe entry point
+      const { ensureCryptoReady } = await import("./crypto");
+      ensureCryptoReady(storage);
+      const plaintext = "auto-init-test";
+      const ct = await encrypt(plaintext);
+      const pt = await decrypt(ct);
+      expect(pt).toBe(plaintext);
+    });
+  });
 });
