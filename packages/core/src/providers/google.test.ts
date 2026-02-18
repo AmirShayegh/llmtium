@@ -140,6 +140,17 @@ describe("googleProvider", () => {
       expect(result.success).toBe(false);
       if (!result.success) expect(result.error).toBe("Connection failed");
     });
+
+    it("should return Connection failed for error with status undefined and ECONNREFUSED", async () => {
+      // Simulates @google/genai APIConnectionError which has status=undefined
+      const connError = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:443"), { status: undefined });
+      mockGenerateContentStream.mockRejectedValue(connError);
+
+      const result = await provider.googleProvider.draft(config, { userPrompt: "test" });
+
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error).toBe("Connection failed");
+    });
   });
 
   describe("structuredOutput", () => {
