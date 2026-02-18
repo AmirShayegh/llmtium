@@ -8,9 +8,12 @@ export type {
 } from "./types/index.js";
 
 export type {
+  ProviderMeta,
   ProviderConfig,
   DraftRequest,
   DraftResponse,
+  StructuredRequest,
+  JsonSchema,
   ProviderResult,
   Provider,
 } from "./providers/index.js";

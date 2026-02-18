@@ -1,7 +1,10 @@
 export type {
+  ProviderMeta,
   ProviderConfig,
   DraftRequest,
   DraftResponse,
+  StructuredRequest,
+  JsonSchema,
   ProviderResult,
   Provider,
 } from "./types.js";
