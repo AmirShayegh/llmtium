@@ -150,6 +150,18 @@ describe("anonymizer", () => {
   });
 
   describe("edge cases", () => {
+    it("should handle exactly 26 responses", () => {
+      const max = new Map<string, string>();
+      for (let i = 0; i < 26; i++) {
+        max.set(`model-${i}`, `Content ${i}`);
+      }
+      const { anonymized, mapping } = anonymize(max);
+      expect(anonymized).toHaveLength(26);
+      expect(mapping.size).toBe(26);
+      const labels = new Set(anonymized.map((r) => r.label));
+      expect(labels.size).toBe(26);
+    });
+
     it("should throw when given more than 26 responses", () => {
       const tooMany = new Map<string, string>();
       for (let i = 0; i < 27; i++) {
