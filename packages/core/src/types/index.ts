@@ -24,3 +24,9 @@ export type {
   PipelineTelemetry,
   PipelineResult,
 } from "./pipeline.js";
+
+export type {
+  WorkflowType,
+  WorkflowInput,
+  WorkflowResult,
+} from "./workflow.js";
