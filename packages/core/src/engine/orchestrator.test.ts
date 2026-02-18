@@ -253,6 +253,23 @@ describe("orchestrator", () => {
       const synthErrors = result.errors.filter((e) => e.stage === "synthesis");
       expect(synthErrors).toHaveLength(1);
     });
+
+    it("should handle synthesizer throwing an exception", async () => {
+      const { config } = buildHappyConfig();
+      (config.synthesizer.provider.structuredOutput as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error("synth exploded");
+      });
+
+      const result = await runPipeline(config);
+
+      expect(result.status).toBe("partial");
+      expect(result.drafts.size).toBe(3);
+      expect(result.reviews.size).toBe(3);
+      expect(result.synthesis).toBeNull();
+      expect(result.errors.some((e) => e.stage === "synthesis" && e.error.includes("synth exploded"))).toBe(
+        true,
+      );
+    });
   });
 
   describe("anonymizer integration", () => {
