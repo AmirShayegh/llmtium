@@ -33,7 +33,7 @@ function StatusDot({ status }: { status: KeyStatus }) {
 
 function ProviderRow({ id, name, placeholder }: { id: string; name: string; placeholder: string }) {
   const providerState = useStore(store, (s) => s.providers[id]!);
-  const setKey = useStore(store, (s) => s.setKey);
+  const setEncryptedKey = useStore(store, (s) => s.setEncryptedKey);
   const setStatus = useStore(store, (s) => s.setStatus);
   const removeKey = useStore(store, (s) => s.removeKey);
 
@@ -43,7 +43,10 @@ function ProviderRow({ id, name, placeholder }: { id: string; name: string; plac
   const handleInputChange = useCallback((value: string) => {
     setInput(value);
     setValidatedKey(null);
-  }, []);
+    if (value) {
+      setStatus(id, "untested");
+    }
+  }, [id, setStatus]);
 
   const handleValidate = useCallback(async () => {
     if (!input.trim()) return;
@@ -72,11 +75,15 @@ function ProviderRow({ id, name, placeholder }: { id: string; name: string; plac
 
   const handleSave = useCallback(async () => {
     if (!validatedKey || input !== validatedKey) return;
-    const encrypted = await encrypt(input);
-    setKey(id, encrypted);
-    setInput("");
-    setValidatedKey(null);
-  }, [id, input, validatedKey, setKey]);
+    try {
+      const encrypted = await encrypt(input);
+      setEncryptedKey(id, encrypted);
+      setInput("");
+      setValidatedKey(null);
+    } catch {
+      setStatus(id, "invalid", "Failed to encrypt key");
+    }
+  }, [id, input, validatedKey, setEncryptedKey, setStatus]);
 
   const handleRemove = useCallback(() => {
     removeKey(id);

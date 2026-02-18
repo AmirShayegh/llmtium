@@ -42,7 +42,7 @@ describe("keys store", () => {
 
   it("should store encrypted key via setKey", async () => {
     const encrypted = await encrypt("sk-ant-secret");
-    store.getState().setKey("anthropic", encrypted);
+    store.getState().setEncryptedKey("anthropic", encrypted);
 
     const state = store.getState();
     expect(state.providers.anthropic!.encryptedKey).toBe(encrypted);
@@ -66,7 +66,7 @@ describe("keys store", () => {
 
   it("should clear key and reset status via removeKey", async () => {
     const encrypted = await encrypt("sk-ant-secret");
-    store.getState().setKey("anthropic", encrypted);
+    store.getState().setEncryptedKey("anthropic", encrypted);
     store.getState().setStatus("anthropic", "valid");
     store.getState().removeKey("anthropic");
 
@@ -79,15 +79,15 @@ describe("keys store", () => {
     it("should return true with 2+ configured providers", async () => {
       const enc1 = await encrypt("key1");
       const enc2 = await encrypt("key2");
-      store.getState().setKey("anthropic", enc1);
-      store.getState().setKey("openai", enc2);
+      store.getState().setEncryptedKey("anthropic", enc1);
+      store.getState().setEncryptedKey("openai", enc2);
 
       expect(store.getState().hasValidKeys()).toBe(true);
     });
 
     it("should return false with fewer than 2 configured providers", async () => {
       const enc1 = await encrypt("key1");
-      store.getState().setKey("anthropic", enc1);
+      store.getState().setEncryptedKey("anthropic", enc1);
 
       expect(store.getState().hasValidKeys()).toBe(false);
     });
@@ -95,8 +95,8 @@ describe("keys store", () => {
     it("should return true even when status is not valid (checks config, not status)", async () => {
       const enc1 = await encrypt("key1");
       const enc2 = await encrypt("key2");
-      store.getState().setKey("anthropic", enc1);
-      store.getState().setKey("openai", enc2);
+      store.getState().setEncryptedKey("anthropic", enc1);
+      store.getState().setEncryptedKey("openai", enc2);
       // Status is untested (default after setKey), not "valid"
       // hasValidKeys should still return true since keys are configured
 
@@ -107,8 +107,8 @@ describe("keys store", () => {
   it("should return configured provider IDs via getConfiguredProviderIds", async () => {
     const enc1 = await encrypt("key1");
     const enc2 = await encrypt("key2");
-    store.getState().setKey("anthropic", enc1);
-    store.getState().setKey("google", enc2);
+    store.getState().setEncryptedKey("anthropic", enc1);
+    store.getState().setEncryptedKey("google", enc2);
 
     const ids = store.getState().getConfiguredProviderIds();
     expect(ids).toContain("anthropic");
@@ -117,13 +117,27 @@ describe("keys store", () => {
   });
 
   it("should decrypt all configured keys via getKeys", async () => {
-    store.getState().setKey("anthropic", await encrypt("sk-ant-secret"));
-    store.getState().setKey("openai", await encrypt("sk-oai-secret"));
+    store.getState().setEncryptedKey("anthropic", await encrypt("sk-ant-secret"));
+    store.getState().setEncryptedKey("openai", await encrypt("sk-oai-secret"));
 
     const keys = await store.getState().getKeys();
     expect(keys).toEqual({
       anthropic: "sk-ant-secret",
       openai: "sk-oai-secret",
     });
+  });
+
+  it("should persist state across store re-creation", async () => {
+    const enc = await encrypt("sk-persist-test");
+    store.getState().setEncryptedKey("anthropic", enc);
+    store.getState().setStatus("anthropic", "valid");
+
+    // Create a new store with the same backing storage — simulates page reload
+    const store2 = createKeysStore(storage);
+
+    // Zustand persist rehydrates synchronously from the storage adapter
+    const state = store2.getState();
+    expect(state.providers.anthropic!.encryptedKey).toBe(enc);
+    expect(state.providers.anthropic!.status).toBe("valid");
   });
 });
