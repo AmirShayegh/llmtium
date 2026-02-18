@@ -160,9 +160,10 @@ describe("openaiProvider", () => {
     });
 
     it("should return error when content is null", async () => {
-      mockCreate.mockResolvedValue({
-        choices: [{ message: { content: null } }],
-      });
+      mockCreate
+        .mockResolvedValueOnce({ choices: [{ message: { content: null } }] })
+        .mockResolvedValueOnce({ choices: [{ message: { content: null } }] })
+        .mockResolvedValueOnce({ choices: [{ message: { content: null } }] });
 
       const result = await provider.openaiProvider.structuredOutput(config, structuredReq);
 
@@ -185,15 +186,16 @@ describe("openaiProvider", () => {
       expect(mockCreate).toHaveBeenCalledTimes(2);
     });
 
-    it("should return error after 2 consecutive failures", async () => {
+    it("should return error after 3 consecutive parse failures", async () => {
       mockCreate
         .mockResolvedValueOnce({ choices: [{ message: { content: "bad" } }] })
-        .mockResolvedValueOnce({ choices: [{ message: { content: "still bad" } }] });
+        .mockResolvedValueOnce({ choices: [{ message: { content: "still bad" } }] })
+        .mockResolvedValueOnce({ choices: [{ message: { content: "very bad" } }] });
 
       const result = await provider.openaiProvider.structuredOutput(config, structuredReq);
 
       expect(result.success).toBe(false);
-      if (!result.success) expect(result.error).toContain("Structured output failed after 2 attempts");
+      if (!result.success) expect(result.error).toContain("Structured output failed after 3 attempts");
     });
   });
 
