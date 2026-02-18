@@ -287,7 +287,8 @@ describe("googleProvider", () => {
     });
 
     it("should fail immediately on API error without retrying", async () => {
-      mockGenerateContent.mockRejectedValueOnce(new Error("Rate limit exceeded"));
+      const apiError = Object.assign(new Error("Rate limited"), { status: 429 });
+      mockGenerateContent.mockRejectedValueOnce(apiError);
 
       const result = await provider.googleProvider.structuredOutput(config, structuredReq);
 

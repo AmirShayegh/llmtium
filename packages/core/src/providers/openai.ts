@@ -84,18 +84,23 @@ async function structuredOutput<T>(
       : request.userPrompt;
     messages.push({ role: "user", content: userContent });
 
-    const response = await client.chat.completions.create({
-      model,
-      messages,
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: request.toolName,
-          schema: request.schema,
-          strict: true,
+    let response;
+    try {
+      response = await client.chat.completions.create({
+        model,
+        messages,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: request.toolName,
+            schema: request.schema,
+            strict: true,
+          },
         },
-      },
-    });
+      });
+    } catch (error) {
+      throw new Error(formatError(error));
+    }
 
     const content = response.choices[0]?.message?.content;
     // Null/empty content is a malformed response — return empty to trigger retry

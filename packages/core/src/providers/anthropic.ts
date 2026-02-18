@@ -78,20 +78,25 @@ async function structuredOutput<T>(
       ? `${request.userPrompt}\n\n${retryPrompt}`
       : request.userPrompt;
 
-    const response = await client.messages.create({
-      model,
-      max_tokens: MAX_TOKENS,
-      system: request.systemPrompt,
-      messages: [{ role: "user", content: userContent }],
-      tools: [
-        {
-          name: request.toolName,
-          description: request.toolDescription,
-          input_schema: request.schema as Anthropic.Tool.InputSchema,
-        },
-      ],
-      tool_choice: { type: "tool" as const, name: request.toolName },
-    });
+    let response;
+    try {
+      response = await client.messages.create({
+        model,
+        max_tokens: MAX_TOKENS,
+        system: request.systemPrompt,
+        messages: [{ role: "user", content: userContent }],
+        tools: [
+          {
+            name: request.toolName,
+            description: request.toolDescription,
+            input_schema: request.schema as Anthropic.Tool.InputSchema,
+          },
+        ],
+        tool_choice: { type: "tool" as const, name: request.toolName },
+      });
+    } catch (error) {
+      throw new Error(formatError(error));
+    }
 
     const toolBlock = response.content.find(
       (block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
