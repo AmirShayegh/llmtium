@@ -60,9 +60,9 @@ describe("consortium store", () => {
         runStatus: "running",
         models: ["anthropic", "openai", "google"],
         stages: {
-          draft: { status: "pending", models: {}, durationMs: null },
-          review: { status: "pending", models: {}, durationMs: null },
-          synthesis: { status: "pending", models: {}, durationMs: null },
+          draft: { status: "pending", models: {}, durationMs: null, startedAt: null },
+          review: { status: "pending", models: {}, durationMs: null, startedAt: null },
+          synthesis: { status: "pending", models: {}, durationMs: null, startedAt: null },
         },
       });
     });
@@ -95,6 +95,18 @@ describe("consortium store", () => {
       const state = store.getState();
       expect(state.stages.draft.models.openai).toBe("failed");
     });
+
+    it("should store error message on draft:failed", () => {
+      store.getState().handleEvent({
+        stage: "draft", model: "openai", status: "failed", error: "Rate limit exceeded",
+      });
+
+      expect(store.getState().errors).toContainEqual({
+        stage: "draft",
+        model: "openai",
+        error: "Rate limit exceeded",
+      });
+    });
   });
 
   describe("handleEvent: review stage", () => {
@@ -103,9 +115,9 @@ describe("consortium store", () => {
         runStatus: "running",
         models: ["anthropic", "openai"],
         stages: {
-          draft: { status: "running", models: { anthropic: "complete", openai: "complete" }, durationMs: null },
-          review: { status: "pending", models: {}, durationMs: null },
-          synthesis: { status: "pending", models: {}, durationMs: null },
+          draft: { status: "running", models: { anthropic: "complete", openai: "complete" }, durationMs: null, startedAt: null },
+          review: { status: "pending", models: {}, durationMs: null, startedAt: null },
+          synthesis: { status: "pending", models: {}, durationMs: null, startedAt: null },
         },
       });
     });
@@ -119,6 +131,30 @@ describe("consortium store", () => {
       expect(state.stages.draft.status).toBe("complete");
       expect(state.stages.review.status).toBe("running");
       expect(state.stages.review.models.anthropic).toBe("running");
+    });
+
+    it("should set stage startedAt when transitioning to running", () => {
+      const before = Date.now();
+      store.getState().handleEvent({
+        stage: "review", model: "anthropic", status: "started",
+      });
+      const after = Date.now();
+
+      const state = store.getState();
+      expect(state.stages.review.startedAt).toBeGreaterThanOrEqual(before);
+      expect(state.stages.review.startedAt).toBeLessThanOrEqual(after);
+    });
+
+    it("should store error message on review:failed", () => {
+      store.getState().handleEvent({
+        stage: "review", model: "openai", status: "failed", error: "Structured output parse failed",
+      });
+
+      expect(store.getState().errors).toContainEqual({
+        stage: "review",
+        model: "openai",
+        error: "Structured output parse failed",
+      });
     });
 
     it("should store CrossReview on review:complete", () => {
@@ -139,9 +175,9 @@ describe("consortium store", () => {
         runStatus: "running",
         models: ["anthropic", "openai"],
         stages: {
-          draft: { status: "complete", models: { anthropic: "complete", openai: "complete" }, durationMs: null },
-          review: { status: "running", models: { anthropic: "complete", openai: "complete" }, durationMs: null },
-          synthesis: { status: "pending", models: {}, durationMs: null },
+          draft: { status: "complete", models: { anthropic: "complete", openai: "complete" }, durationMs: null, startedAt: null },
+          review: { status: "running", models: { anthropic: "complete", openai: "complete" }, durationMs: null, startedAt: null },
+          synthesis: { status: "pending", models: {}, durationMs: null, startedAt: null },
         },
       });
     });
@@ -184,9 +220,9 @@ describe("consortium store", () => {
         runStatus: "running",
         models: ["anthropic", "openai"],
         stages: {
-          draft: { status: "complete", models: { anthropic: "complete", openai: "complete" }, durationMs: null },
-          review: { status: "complete", models: { anthropic: "complete", openai: "complete" }, durationMs: null },
-          synthesis: { status: "complete", models: { anthropic: "complete" }, durationMs: null },
+          draft: { status: "complete", models: { anthropic: "complete", openai: "complete" }, durationMs: null, startedAt: null },
+          review: { status: "complete", models: { anthropic: "complete", openai: "complete" }, durationMs: null, startedAt: null },
+          synthesis: { status: "complete", models: { anthropic: "complete" }, durationMs: null, startedAt: null },
         },
       });
     });
@@ -259,9 +295,9 @@ describe("consortium store", () => {
         runStatus: "running",
         models: ["anthropic", "openai", "google"],
         stages: {
-          draft: { status: "running", models: {}, durationMs: null },
-          review: { status: "pending", models: {}, durationMs: null },
-          synthesis: { status: "pending", models: {}, durationMs: null },
+          draft: { status: "running", models: {}, durationMs: null, startedAt: null },
+          review: { status: "pending", models: {}, durationMs: null, startedAt: null },
+          synthesis: { status: "pending", models: {}, durationMs: null, startedAt: null },
         },
       });
     });
@@ -300,9 +336,9 @@ describe("consortium store", () => {
         runStatus: "running",
         models: ["anthropic"],
         stages: {
-          draft: { status: "complete", models: { anthropic: "complete" }, durationMs: null },
-          review: { status: "complete", models: { anthropic: "complete" }, durationMs: null },
-          synthesis: { status: "complete", models: { anthropic: "complete" }, durationMs: null },
+          draft: { status: "complete", models: { anthropic: "complete" }, durationMs: null, startedAt: null },
+          review: { status: "complete", models: { anthropic: "complete" }, durationMs: null, startedAt: null },
+          synthesis: { status: "complete", models: { anthropic: "complete" }, durationMs: null, startedAt: null },
         },
       });
 
@@ -329,9 +365,9 @@ describe("consortium store", () => {
         runStatus: "running",
         models: ["anthropic", "openai"],
         stages: {
-          draft: { status: "running", models: { anthropic: "failed", openai: "failed" }, durationMs: null },
-          review: { status: "pending", models: {}, durationMs: null },
-          synthesis: { status: "pending", models: {}, durationMs: null },
+          draft: { status: "running", models: { anthropic: "failed", openai: "failed" }, durationMs: null, startedAt: null },
+          review: { status: "pending", models: {}, durationMs: null, startedAt: null },
+          synthesis: { status: "pending", models: {}, durationMs: null, startedAt: null },
         },
       });
 
@@ -346,9 +382,104 @@ describe("consortium store", () => {
       expect(state.stages.review.status).toBe("failed");
       expect(state.stages.synthesis.status).toBe("failed");
     });
+
+    it("should mark never-ran stages as failed on done:complete with result.status partial", () => {
+      // Route sends done:"complete" even when result.status is "partial" or "failed"
+      // All drafts failed but pipeline didn't throw → done:complete with result.status "failed"
+      store.setState({
+        runStatus: "running",
+        models: ["anthropic", "openai"],
+        stages: {
+          draft: { status: "running", models: { anthropic: "complete", openai: "failed" }, durationMs: null, startedAt: null },
+          review: { status: "pending", models: {}, durationMs: null, startedAt: null },
+          synthesis: { status: "pending", models: {}, durationMs: null, startedAt: null },
+        },
+      });
+
+      store.getState().handleEvent({
+        stage: "done",
+        status: "complete",
+        result: {
+          status: "partial",
+          stages: { mapping: null },
+          telemetry: { stageDurationMs: { draft: 1000 } },
+        },
+      });
+
+      const state = store.getState();
+      expect(state.runStatus).toBe("complete");
+      expect(state.stages.draft.status).toBe("partial");
+      expect(state.stages.review.status).toBe("failed");
+      expect(state.stages.synthesis.status).toBe("failed");
+    });
+
+    it("should mark never-ran stages as failed on done:complete with result.status failed", () => {
+      store.setState({
+        runStatus: "running",
+        models: ["anthropic", "openai"],
+        stages: {
+          draft: { status: "running", models: { anthropic: "failed", openai: "failed" }, durationMs: null, startedAt: null },
+          review: { status: "pending", models: {}, durationMs: null, startedAt: null },
+          synthesis: { status: "pending", models: {}, durationMs: null, startedAt: null },
+        },
+      });
+
+      store.getState().handleEvent({
+        stage: "done",
+        status: "complete",
+        result: {
+          status: "failed",
+          stages: { mapping: null },
+          telemetry: { stageDurationMs: { draft: 500 } },
+        },
+      });
+
+      const state = store.getState();
+      expect(state.runStatus).toBe("complete");
+      expect(state.stages.draft.status).toBe("failed");
+      expect(state.stages.review.status).toBe("failed");
+      expect(state.stages.synthesis.status).toBe("failed");
+    });
   });
 
   describe("startRun", () => {
+    it("should pre-populate draft models as pending at run start", async () => {
+      const mockFetcher = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(
+              new TextEncoder().encode(
+                'data: {"stage":"done","status":"complete","result":{"status":"success","stages":{"mapping":null},"telemetry":{"stageDurationMs":{"draft":0,"review":0,"synthesis":0}}}}\n\n',
+              ),
+            );
+            controller.close();
+          },
+        }),
+      } as unknown as Response);
+
+      const s = createConsortiumStore({
+        fetcher: mockFetcher,
+        getKeys: async () => ({ anthropic: "sk-ant", openai: "sk-oai" }),
+      });
+
+      // Start run but check state before stream events arrive
+      const runPromise = s.getState().startRun("test", ["anthropic", "openai"], "anthropic");
+
+      // Before any events, all stages should show per-model pending indicators
+      const state = s.getState();
+      expect(state.stages.draft.models.anthropic).toBe("pending");
+      expect(state.stages.draft.models.openai).toBe("pending");
+      expect(state.stages.review.models.anthropic).toBe("pending");
+      expect(state.stages.review.models.openai).toBe("pending");
+      // Synthesis uses the synthesizer model only
+      expect(state.stages.synthesis.models.anthropic).toBe("pending");
+      expect(state.stages.synthesis.models.openai).toBeUndefined();
+
+      await runPromise;
+    });
+
     it("should call fetch with correct parameters", async () => {
       const mockFetcher = vi.fn().mockResolvedValue({
         ok: true,
@@ -423,9 +554,9 @@ describe("consortium store", () => {
         runId: 1,
         models: ["anthropic"],
         stages: {
-          draft: { status: "running", models: {}, durationMs: null },
-          review: { status: "pending", models: {}, durationMs: null },
-          synthesis: { status: "pending", models: {}, durationMs: null },
+          draft: { status: "running", models: {}, durationMs: null, startedAt: null },
+          review: { status: "pending", models: {}, durationMs: null, startedAt: null },
+          synthesis: { status: "pending", models: {}, durationMs: null, startedAt: null },
         },
       });
 
@@ -440,9 +571,9 @@ describe("consortium store", () => {
         models: ["anthropic"],
         drafts: {},
         stages: {
-          draft: { status: "running", models: {}, durationMs: null },
-          review: { status: "pending", models: {}, durationMs: null },
-          synthesis: { status: "pending", models: {}, durationMs: null },
+          draft: { status: "running", models: {}, durationMs: null, startedAt: null },
+          review: { status: "pending", models: {}, durationMs: null, startedAt: null },
+          synthesis: { status: "pending", models: {}, durationMs: null, startedAt: null },
         },
       });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { ReviewPlanInput, WorkflowResult, PipelineEvent } from "@llmtium/core";
+import type { ReviewPlanInput, WorkflowResult } from "@llmtium/core";
 
 vi.mock("@llmtium/core", () => ({
   anthropicProvider: {

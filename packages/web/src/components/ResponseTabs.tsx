@@ -14,6 +14,7 @@ export function ResponseTabs({ store }: ResponseTabsProps) {
   const models = useStore(store, (s) => s.models);
   const drafts = useStore(store, (s) => s.drafts);
   const draftModels = useStore(store, (s) => s.stages.draft.models);
+  const errors = useStore(store, (s) => s.errors);
 
   if (models.length === 0) return null;
 
@@ -41,7 +42,7 @@ export function ResponseTabs({ store }: ResponseTabsProps) {
           <TabsContent key={id} value={id} className="mt-4">
             {status === "failed" ? (
               <p className="text-sm text-destructive">
-                Draft failed for this model.
+                {errors.find((e) => e.stage === "draft" && e.model === id)?.error ?? "Draft failed for this model."}
               </p>
             ) : content ? (
               <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-foreground">
