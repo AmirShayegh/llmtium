@@ -155,6 +155,10 @@ describe("reviewPlan", () => {
       expect(userPrompt).toContain("Use microservices");
       expect(userPrompt).toContain("Use monolith");
       expect(userPrompt).toContain(capturedConfig.prompt);
+      expect(userPrompt).toContain("Respond with ONLY this JSON structure");
+      expect(userPrompt).toContain('"scores"');
+      expect(userPrompt).toContain('"disagreements"');
+      expect(userPrompt).toContain('"confidence"');
     });
 
     it("should use correct cross-review system prompt", async () => {
@@ -219,6 +223,10 @@ describe("reviewPlan", () => {
       expect(userPrompt).toContain("Use SQLite");
       expect(userPrompt).toContain("0.85");
       expect(userPrompt).toContain("No backup strategy");
+      expect(userPrompt).toContain("Respond with ONLY this JSON structure");
+      expect(userPrompt).toContain('"output"');
+      expect(userPrompt).toContain('"resolved_disagreements"');
+      expect(userPrompt).toContain('"action_items"');
     });
 
     it("should use correct synthesis system prompt", async () => {

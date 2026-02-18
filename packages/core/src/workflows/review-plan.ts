@@ -88,7 +88,12 @@ function buildReviewPrompt(params: ReviewPromptParams): { systemPrompt: string; 
     .map((r) => `### ${r.label}\n\n${r.content}`)
     .join("\n\n---\n\n");
 
-  const userPrompt = `## Original Prompt\n\n${params.userPrompt}\n\n## Responses to Review\n\n${responseSections}\n\n## Your Task\n\nEvaluate these responses against the original prompt. Produce a JSON review with:\n- Scores (1-5) for each response on correctness, completeness, actionability, and clarity\n- The most important issues you found across all responses\n- Explicit disagreements between responses, with direct quotes\n- Information that is missing from ALL responses\n- Your confidence level (0-1) in your own assessment`;
+  const responseLabels = params.responses.map((r) => r.label);
+  const scorePlaceholders = responseLabels
+    .map((label) => `    "${label}": {\n      "correctness": "<1-5>",\n      "completeness": "<1-5>",\n      "actionability": "<1-5>",\n      "clarity": "<1-5>"\n    }`)
+    .join(",\n");
+
+  const userPrompt = `## Original Prompt\n\n${params.userPrompt}\n\n## Responses to Review\n\n${responseSections}\n\n## Your Task\n\nEvaluate these responses against the original prompt. Produce a JSON review with:\n- Scores (1-5) for each response on correctness, completeness, actionability, and clarity\n- The most important issues you found across all responses\n- Explicit disagreements between responses, with direct quotes\n- Information that is missing from ALL responses\n- Your confidence level (0-1) in your own assessment\n\nRespond with ONLY this JSON structure:\n\n{\n  "scores": {\n${scorePlaceholders}\n  },\n  "issues": [\n    "Issue description referencing which response(s) it applies to"\n  ],\n  "disagreements": [\n    {\n      "topic": "What the disagreement is about",\n      "a": {\n        "response_id": "Response A",\n        "quote": "Exact quote from Response A"\n      },\n      "b": {\n        "response_id": "Response B",\n        "quote": "Exact quote from Response B"\n      },\n      "assessment": "Your analysis of who is more correct and why",\n      "suggested_resolution": "How to resolve this (optional)"\n    }\n  ],\n  "missing_info": [\n    "Important information or consideration that no response addressed"\n  ],\n  "confidence": "<0.0-1.0>",\n  "confidence_reason": "Why you are this confident in your review",\n  "notes": "Any additional observations (optional, null if none)"\n}`;
 
   return { systemPrompt: CROSS_REVIEW_SYSTEM_PROMPT, userPrompt };
 }
@@ -116,7 +121,7 @@ function buildSynthesisPrompt(params: SynthesisPromptParams): { systemPrompt: st
     })
     .join("\n\n---\n\n");
 
-  const userPrompt = `## Original Prompt\n\n${params.userPrompt}\n\n## Expert Responses\n\n${draftSections}\n\n## Structured Reviews\n\n${reviewSections}\n\n## Your Task\n\nSynthesize the best possible response to the original prompt. Use the reviews to guide which elements to keep, which disagreements to resolve, and what gaps to fill.`;
+  const userPrompt = `## Original Prompt\n\n${params.userPrompt}\n\n## Expert Responses\n\n${draftSections}\n\n## Structured Reviews\n\n${reviewSections}\n\n## Your Task\n\nSynthesize the best possible response to the original prompt. Use the reviews to guide which elements to keep, which disagreements to resolve, and what gaps to fill.\n\nRespond with ONLY this JSON structure:\n\n{\n  "output": "Your complete synthesized response to the original prompt. This is the main deliverable. Write it as if the user will only read this section. Be thorough and direct.",\n  "resolved_disagreements": [\n    {\n      "topic": "What the disagreement was about",\n      "chosen_position": "The position you chose",\n      "rationale": "Why you chose it, citing evidence from the responses",\n      "supporting_responses": ["A", "C"]\n    }\n  ],\n  "open_questions": [\n    "Things that remain genuinely uncertain or unresolved and require more information"\n  ],\n  "action_items": [\n    {\n      "priority": "P0",\n      "item": "Concrete next step the user should take"\n    }\n  ],\n  "confidence": "<0.0-1.0>",\n  "confidence_reason": "Why you are this confident in the synthesis"\n}`;
 
   return { systemPrompt: SYNTHESIS_SYSTEM_PROMPT, userPrompt };
 }
