@@ -87,15 +87,20 @@ async function structuredOutput<T>(
       ? `${request.userPrompt}\n\n${retryPrompt}`
       : request.userPrompt;
 
-    const result = await ai.models.generateContent({
-      model: modelName,
-      contents: userContent,
-      config: {
-        systemInstruction: request.systemPrompt,
-        responseMimeType: "application/json",
-        responseJsonSchema: request.schema,
-      },
-    });
+    let result;
+    try {
+      result = await ai.models.generateContent({
+        model: modelName,
+        contents: userContent,
+        config: {
+          systemInstruction: request.systemPrompt,
+          responseMimeType: "application/json",
+          responseJsonSchema: request.schema,
+        },
+      });
+    } catch (error) {
+      throw new Error(formatError(error));
+    }
 
     // Empty text is a malformed response — return empty to trigger retry
     return result.text ?? "";

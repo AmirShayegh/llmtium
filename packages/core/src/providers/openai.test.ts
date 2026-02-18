@@ -204,7 +204,7 @@ describe("openaiProvider", () => {
       const result = await provider.openaiProvider.structuredOutput(config, structuredReq);
 
       expect(result.success).toBe(false);
-      if (!result.success) expect(result.error).toBe("Rate limited");
+      if (!result.success) expect(result.error).toBe("Rate limit exceeded");
       expect(mockCreate).toHaveBeenCalledTimes(1);
     });
   });
