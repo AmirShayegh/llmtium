@@ -12,17 +12,21 @@ import { withStructuredRetry } from "./structured-retry.js";
 const DEFAULT_MODEL = "gemini-2.0-flash";
 
 function formatError(error: unknown): string {
-  // New SDK's ApiError has a status property
-  if (error instanceof Error && "status" in error) {
+  if (!(error instanceof Error)) return String(error);
+  const msg = error.message;
+  // Check connection errors first — SDK's APIConnectionError has status=undefined
+  if (msg.includes("ECONNREFUSED") || msg.includes("ETIMEDOUT"))
+    return "Connection failed";
+  // Then check API status codes (only if status is a number)
+  if (
+    "status" in error &&
+    typeof (error as { status: unknown }).status === "number"
+  ) {
     const status = (error as { status: number }).status;
     if (status === 401 || status === 403) return "Invalid API key";
     if (status === 429) return "Rate limit exceeded";
-    return `API error (${status}): ${error.message}`;
+    return `API error (${status}): ${msg}`;
   }
-  if (!(error instanceof Error)) return String(error);
-  const msg = error.message;
-  if (msg.includes("ECONNREFUSED") || msg.includes("ETIMEDOUT"))
-    return "Connection failed";
   return msg;
 }
 
