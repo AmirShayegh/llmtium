@@ -112,7 +112,6 @@ function StageColumn({ name, status, models, durationMs, startedAt, isLast }: St
 export function StageProgress({ store }: StageProgressProps) {
   const runStatus = useStore(store, (s) => s.runStatus);
   const stages = useStore(store, (s) => s.stages);
-  const startedAt = useStore(store, (s) => s.startedAt);
 
   if (runStatus === "idle") return null;
 
@@ -123,21 +122,21 @@ export function StageProgress({ store }: StageProgressProps) {
         status={stages.draft.status}
         models={stages.draft.models}
         durationMs={stages.draft.durationMs}
-        startedAt={startedAt}
+        startedAt={stages.draft.startedAt}
       />
       <StageColumn
         name="Review"
         status={stages.review.status}
         models={stages.review.models}
         durationMs={stages.review.durationMs}
-        startedAt={startedAt}
+        startedAt={stages.review.startedAt}
       />
       <StageColumn
         name="Synthesis"
         status={stages.synthesis.status}
         models={stages.synthesis.models}
         durationMs={stages.synthesis.durationMs}
-        startedAt={startedAt}
+        startedAt={stages.synthesis.startedAt}
         isLast
       />
     </div>

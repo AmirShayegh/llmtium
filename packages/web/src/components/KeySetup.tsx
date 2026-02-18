@@ -161,7 +161,7 @@ export function KeySetup() {
 
   useEffect(() => {
     initCrypto(localStorage);
-    setReady(true);
+    setReady(true); // eslint-disable-line react-hooks/set-state-in-effect -- one-time client-only init
   }, []);
 
   if (!ready) return null;

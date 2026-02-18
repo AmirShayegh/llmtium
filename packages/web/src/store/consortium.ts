@@ -11,6 +11,7 @@ export interface StageState {
   status: StageStatus;
   models: Record<string, ModelStatus>;
   durationMs: number | null;
+  startedAt: number | null;
 }
 
 export interface ConsortiumState {
@@ -44,7 +45,7 @@ export interface ConsortiumState {
 }
 
 function makeStage(): StageState {
-  return { status: "pending", models: {}, durationMs: null };
+  return { status: "pending", models: {}, durationMs: null, startedAt: null };
 }
 
 function makeInitialState() {
@@ -100,6 +101,7 @@ export function createConsortiumStore(options?: ConsortiumStoreOptions) {
           const draft = { ...state.stages.draft };
           if (status === "started") {
             draft.status = "running";
+            if (draft.startedAt === null) draft.startedAt = Date.now();
             draft.models = { ...draft.models, [model!]: "running" as ModelStatus };
           } else if (status === "complete") {
             draft.models = { ...draft.models, [model!]: "complete" as ModelStatus };
@@ -109,6 +111,10 @@ export function createConsortiumStore(options?: ConsortiumStoreOptions) {
             };
           } else if (status === "failed") {
             draft.models = { ...draft.models, [model!]: "failed" as ModelStatus };
+            return {
+              stages: { ...state.stages, draft },
+              errors: [...state.errors, { stage: "draft", model: model!, error: (event.error as string) ?? "Unknown error" }],
+            };
           }
           return { stages: { ...state.stages, draft } };
         });
@@ -118,6 +124,7 @@ export function createConsortiumStore(options?: ConsortiumStoreOptions) {
           const review = { ...state.stages.review };
           if (status === "started") {
             review.status = "running";
+            if (review.startedAt === null) review.startedAt = Date.now();
             review.models = { ...review.models, [model!]: "running" as ModelStatus };
           } else if (status === "complete") {
             review.models = { ...review.models, [model!]: "complete" as ModelStatus };
@@ -127,6 +134,10 @@ export function createConsortiumStore(options?: ConsortiumStoreOptions) {
             };
           } else if (status === "failed") {
             review.models = { ...review.models, [model!]: "failed" as ModelStatus };
+            return {
+              stages: { ...state.stages, draft, review },
+              errors: [...state.errors, { stage: "review", model: model!, error: (event.error as string) ?? "Unknown error" }],
+            };
           }
           return { stages: { ...state.stages, draft, review } };
         });
@@ -136,6 +147,7 @@ export function createConsortiumStore(options?: ConsortiumStoreOptions) {
           const synthesis = { ...state.stages.synthesis };
           if (status === "started") {
             synthesis.status = "running";
+            if (synthesis.startedAt === null) synthesis.startedAt = Date.now();
             if (model) {
               synthesis.models = { ...synthesis.models, [model]: "running" as ModelStatus };
             }
@@ -153,6 +165,10 @@ export function createConsortiumStore(options?: ConsortiumStoreOptions) {
             if (model) {
               synthesis.models = { ...synthesis.models, [model]: "failed" as ModelStatus };
             }
+            return {
+              stages: { ...state.stages, review, synthesis },
+              errors: [...state.errors, { stage: "synthesis", model: model ?? "unknown", error: (event.error as string) ?? "Unknown error" }],
+            };
           }
           return { stages: { ...state.stages, review, synthesis } };
         });
@@ -186,7 +202,12 @@ export function createConsortiumStore(options?: ConsortiumStoreOptions) {
           }
 
           // Stages that never ran (still pending) → failed
-          if (status === "error") {
+          // Check both event status AND result.status — route sends done:"complete"
+          // even when result.status is "partial" or "failed"
+          const resultStatus = result?.status as string | undefined;
+          const hasFailure = status === "error" || resultStatus === "partial" || resultStatus === "failed";
+
+          if (hasFailure) {
             if (draft.status === "pending" || draft.status === "running") {
               draft.status = Object.keys(draft.models).length > 0 ? finalizeStage(draft) : "failed";
             }
@@ -225,14 +246,25 @@ export function createConsortiumStore(options?: ConsortiumStoreOptions) {
       _abortController = new AbortController();
       const currentRunId = runId;
 
+      const pendingModels: Record<string, ModelStatus> = {};
+      for (const m of models) {
+        pendingModels[m] = "pending";
+      }
+
+      const initial = makeInitialState();
       set({
-        ...makeInitialState(),
+        ...initial,
         runStatus: "running",
         runId,
         prompt,
         models,
         synthesizer,
         startedAt: Date.now(),
+        stages: {
+          draft: { ...initial.stages.draft, models: { ...pendingModels } },
+          review: { ...initial.stages.review, models: { ...pendingModels } },
+          synthesis: { ...initial.stages.synthesis, models: { [synthesizer]: "pending" as ModelStatus } },
+        },
       });
 
       let receivedDone = false;

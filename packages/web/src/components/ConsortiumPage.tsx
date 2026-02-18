@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useStore } from "zustand";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConsortiumInput } from "@/components/ConsortiumInput";
@@ -19,37 +19,36 @@ const consortiumStore = createConsortiumStore({
 
 export function ConsortiumPage() {
   const runStatus = useStore(consortiumStore, (s) => s.runStatus);
-  const draftStage = useStore(consortiumStore, (s) => s.stages.draft.status);
   const reviewStage = useStore(consortiumStore, (s) => s.stages.review.status);
   const synthesisStage = useStore(consortiumStore, (s) => s.stages.synthesis.status);
   const errorMessage = useStore(consortiumStore, (s) => s.errorMessage);
 
-  const [activeTab, setActiveTab] = useState("drafts");
-  const userSelected = useRef(false);
+  // User tab override — null means "follow auto-tab"
+  const [userTab, setUserTab] = useState<string | null>(null);
 
-  // Auto-switch tabs as stages progress
-  useEffect(() => {
-    if (userSelected.current) return;
-
-    if (synthesisStage === "running" || synthesisStage === "complete") {
-      setActiveTab("synthesis");
-    } else if (reviewStage === "running" || reviewStage === "complete" || reviewStage === "partial") {
-      setActiveTab("reviews");
-    } else if (draftStage === "running" || draftStage === "complete" || draftStage === "partial") {
-      setActiveTab("drafts");
-    }
-  }, [draftStage, reviewStage, synthesisStage]);
-
-  // Reset user override when a new run starts
-  useEffect(() => {
+  // Reset user override when a new run starts.
+  // useState for prev-value tracking is the React-recommended pattern for
+  // adjusting state during render (avoids useEffect + setState and useRef during render).
+  const [prevRunStatus, setPrevRunStatus] = useState(runStatus);
+  if (runStatus !== prevRunStatus) {
+    setPrevRunStatus(runStatus);
     if (runStatus === "running") {
-      userSelected.current = false;
+      setUserTab(null);
     }
-  }, [runStatus]);
+  }
+
+  // Derive auto-tab from stage statuses ("drafts" is the default)
+  let autoTab = "drafts";
+  if (synthesisStage === "running" || synthesisStage === "complete") {
+    autoTab = "synthesis";
+  } else if (reviewStage === "running" || reviewStage === "complete" || reviewStage === "partial") {
+    autoTab = "reviews";
+  }
+
+  const activeTab = userTab ?? autoTab;
 
   const handleTabChange = (value: string) => {
-    userSelected.current = true;
-    setActiveTab(value);
+    setUserTab(value);
   };
 
   const showResults = runStatus !== "idle";
