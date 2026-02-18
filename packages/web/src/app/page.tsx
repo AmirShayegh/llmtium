@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <div className="flex min-h-screen items-center justify-center">
@@ -8,6 +10,12 @@ export default function Home() {
         <p className="text-muted-foreground">
           Multi-LLM deliberation, cross-referencing, and synthesis
         </p>
+        <Link
+          href="/settings"
+          className="mt-4 text-sm text-primary hover:underline"
+        >
+          Configure API Keys
+        </Link>
       </main>
     </div>
   );
