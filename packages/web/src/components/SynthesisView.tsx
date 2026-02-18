@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useStore } from "zustand";
 import { Badge } from "@/components/ui/badge";
+import { ExportButton } from "@/components/ExportButton";
 import { PROVIDER_META } from "@/lib/provider-meta";
 import type { ConsortiumState } from "@/store/consortium";
 import type { ResolvedDisagreement } from "@llmtium/core";
@@ -100,14 +101,17 @@ export function SynthesisView({ store }: SynthesisViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header with confidence */}
+      {/* Header with export + confidence */}
       <div className="flex items-center justify-between">
         <h3 className="font-mono text-xs font-medium uppercase tracking-widest text-muted-foreground">
           Synthesized Output
         </h3>
-        <span className="font-mono text-xs tabular-nums text-muted-foreground">
-          confidence {synthesis.confidence.toFixed(2)}
-        </span>
+        <div className="flex items-center gap-3">
+          <ExportButton store={store} />
+          <span className="font-mono text-xs tabular-nums text-muted-foreground">
+            confidence {synthesis.confidence.toFixed(2)}
+          </span>
+        </div>
       </div>
 
       {/* Main output */}
