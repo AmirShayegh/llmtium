@@ -5,36 +5,39 @@ import type { ProviderConfig, StructuredRequest } from "./types.js";
 
 const mockGenerateContentStream = vi.fn();
 const mockGenerateContent = vi.fn();
-const mockGetGenerativeModel = vi.fn(() => ({
-  generateContentStream: mockGenerateContentStream,
-  generateContent: mockGenerateContent,
-}));
 
-vi.mock("@google/generative-ai", () => ({
-  GoogleGenerativeAI: vi.fn(() => ({
-    getGenerativeModel: mockGetGenerativeModel,
+vi.mock("@google/genai", () => ({
+  GoogleGenAI: vi.fn(() => ({
+    models: {
+      generateContentStream: mockGenerateContentStream,
+      generateContent: mockGenerateContent,
+    },
   })),
 }));
 
 // --- Helpers ---
 
-function makeStreamResult(
+function makeStreamChunks(
   texts: string[],
   usage: { promptTokenCount: number; candidatesTokenCount: number },
 ) {
-  const stream = (async function* () {
-    for (const text of texts) {
-      yield { text: () => text };
-    }
+  const chunks = texts.map((text) => ({
+    text,
+    usageMetadata: undefined as
+      | { promptTokenCount: number; candidatesTokenCount: number }
+      | undefined,
+  }));
+  // Last chunk carries usage metadata
+  if (chunks.length > 0) {
+    chunks[chunks.length - 1]!.usageMetadata = usage;
+  }
+  return (async function* () {
+    yield* chunks;
   })();
-  return {
-    stream,
-    response: Promise.resolve({ usageMetadata: usage }),
-  };
 }
 
 function makeContentResult(text: string) {
-  return { response: { text: () => text } };
+  return { text: text || undefined };
 }
 
 const config: ProviderConfig = { apiKey: "test-google-key" };
@@ -67,7 +70,7 @@ describe("googleProvider", () => {
   describe("draft", () => {
     it("should collect text from streamed chunks", async () => {
       mockGenerateContentStream.mockResolvedValue(
-        makeStreamResult(["Hello", " world"], { promptTokenCount: 6, candidatesTokenCount: 3 }),
+        makeStreamChunks(["Hello", " world"], { promptTokenCount: 6, candidatesTokenCount: 3 }),
       );
 
       const result = await provider.googleProvider.draft(config, {
@@ -85,9 +88,9 @@ describe("googleProvider", () => {
       }
     });
 
-    it("should pass systemPrompt as systemInstruction on model", async () => {
+    it("should pass systemPrompt as systemInstruction in config", async () => {
       mockGenerateContentStream.mockResolvedValue(
-        makeStreamResult(["ok"], { promptTokenCount: 1, candidatesTokenCount: 1 }),
+        makeStreamChunks(["ok"], { promptTokenCount: 1, candidatesTokenCount: 1 }),
       );
 
       await provider.googleProvider.draft(config, {
@@ -95,14 +98,16 @@ describe("googleProvider", () => {
         systemPrompt: "Be concise",
       });
 
-      expect(mockGetGenerativeModel).toHaveBeenCalledWith(
-        expect.objectContaining({ systemInstruction: "Be concise" }),
+      expect(mockGenerateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({ systemInstruction: "Be concise" }),
+        }),
       );
     });
 
     it("should use config.model when provided", async () => {
       mockGenerateContentStream.mockResolvedValue(
-        makeStreamResult(["ok"], { promptTokenCount: 1, candidatesTokenCount: 1 }),
+        makeStreamChunks(["ok"], { promptTokenCount: 1, candidatesTokenCount: 1 }),
       );
 
       await provider.googleProvider.draft(
@@ -110,15 +115,14 @@ describe("googleProvider", () => {
         { userPrompt: "test" },
       );
 
-      expect(mockGetGenerativeModel).toHaveBeenCalledWith(
+      expect(mockGenerateContentStream).toHaveBeenCalledWith(
         expect.objectContaining({ model: "gemini-2.5-pro" }),
       );
     });
 
     it("should return error on authentication failure", async () => {
-      mockGenerateContentStream.mockRejectedValue(
-        new Error("API_KEY_INVALID: The provided API key is not valid"),
-      );
+      const apiError = Object.assign(new Error("Unauthorized"), { status: 401 });
+      mockGenerateContentStream.mockRejectedValue(apiError);
 
       const result = await provider.googleProvider.draft(config, { userPrompt: "test" });
 
@@ -151,10 +155,83 @@ describe("googleProvider", () => {
 
       expect(result.success).toBe(true);
       if (result.success) expect(result.data.score).toBe(4.5);
-      expect(mockGetGenerativeModel).toHaveBeenCalledWith(
+      expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          generationConfig: expect.objectContaining({
+          config: expect.objectContaining({
             responseMimeType: "application/json",
+          }),
+        }),
+      );
+    });
+
+    it("should pass schema via responseJsonSchema without cast", async () => {
+      mockGenerateContent.mockResolvedValue(
+        makeContentResult('{"score":4.5}'),
+      );
+
+      await provider.googleProvider.structuredOutput(config, structuredReq);
+
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            responseJsonSchema: structuredReq.schema,
+          }),
+        }),
+      );
+    });
+
+    it("should pass complex nested schema via responseJsonSchema", async () => {
+      const complexSchema = {
+        type: "object",
+        properties: {
+          scores: {
+            type: "object",
+            additionalProperties: {
+              type: "object",
+              properties: {
+                correctness: { type: "number" },
+                completeness: { type: "number" },
+              },
+              required: ["correctness", "completeness"],
+            },
+          },
+          disagreements: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                topic: { type: "string" },
+                a: {
+                  type: "object",
+                  properties: {
+                    response_id: { type: "string" },
+                    quote: { type: "string" },
+                  },
+                  required: ["response_id", "quote"],
+                },
+              },
+              required: ["topic", "a"],
+            },
+          },
+        },
+        required: ["scores", "disagreements"],
+      };
+
+      mockGenerateContent.mockResolvedValue(
+        makeContentResult(JSON.stringify({
+          scores: { A: { correctness: 4, completeness: 3 } },
+          disagreements: [],
+        })),
+      );
+
+      const req = { ...structuredReq, schema: complexSchema };
+      const result = await provider.googleProvider.structuredOutput(config, req);
+
+      expect(result.success).toBe(true);
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            responseJsonSchema: complexSchema,
           }),
         }),
       );
@@ -199,14 +276,12 @@ describe("googleProvider", () => {
     });
 
     it("should fail immediately on API error without retrying", async () => {
-      mockGenerateContent.mockRejectedValueOnce(
-        new Error("API_KEY_INVALID: The provided API key is not valid"),
-      );
+      mockGenerateContent.mockRejectedValueOnce(new Error("Rate limit exceeded"));
 
       const result = await provider.googleProvider.structuredOutput(config, structuredReq);
 
       expect(result.success).toBe(false);
-      if (!result.success) expect(result.error).toBe("API_KEY_INVALID: The provided API key is not valid");
+      if (!result.success) expect(result.error).toBe("Rate limit exceeded");
       expect(mockGenerateContent).toHaveBeenCalledTimes(1);
     });
   });
@@ -221,9 +296,8 @@ describe("googleProvider", () => {
     });
 
     it("should return success false for invalid key", async () => {
-      mockGenerateContent.mockRejectedValue(
-        new Error("API_KEY_INVALID: invalid key"),
-      );
+      const apiError = Object.assign(new Error("Unauthorized"), { status: 401 });
+      mockGenerateContent.mockRejectedValue(apiError);
 
       const result = await provider.googleProvider.validateKey(config);
 
