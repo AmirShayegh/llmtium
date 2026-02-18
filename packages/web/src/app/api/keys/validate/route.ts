@@ -5,7 +5,12 @@ import { resolveProvider } from "@/lib/providers";
 export const runtime = "nodejs";
 
 export async function POST(request: Request): Promise<Response> {
-  const body = await request.json() as Record<string, unknown>;
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json() as Record<string, unknown>;
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
 
   if (typeof body.provider !== "string" || body.provider.length === 0) {
     return Response.json({ error: "provider is required" }, { status: 400 });

@@ -135,6 +135,19 @@ describe("POST /api/consortium/run", () => {
     expect(body.error).toBeDefined();
   });
 
+  it("should return 400 for malformed JSON body", async () => {
+    const request = new Request("http://localhost/api/consortium/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not valid json{{{",
+    });
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBeDefined();
+  });
+
   it("should not include API keys in any SSE event payload", async () => {
     const body = validBody();
 
