@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, type ResponseSchema } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import type {
   Provider,
   ProviderConfig,
@@ -12,11 +12,15 @@ import { withStructuredRetry } from "./structured-retry.js";
 const DEFAULT_MODEL = "gemini-2.0-flash";
 
 function formatError(error: unknown): string {
+  // New SDK's ApiError has a status property
+  if (error instanceof Error && "status" in error) {
+    const status = (error as { status: number }).status;
+    if (status === 401 || status === 403) return "Invalid API key";
+    if (status === 429) return "Rate limit exceeded";
+    return `API error (${status}): ${error.message}`;
+  }
   if (!(error instanceof Error)) return String(error);
   const msg = error.message;
-  if (msg.includes("API_KEY_INVALID") || msg.includes("401"))
-    return "Invalid API key";
-  if (msg.includes("429")) return "Rate limit exceeded";
   if (msg.includes("ECONNREFUSED") || msg.includes("ETIMEDOUT"))
     return "Connection failed";
   return msg;
@@ -28,31 +32,37 @@ async function draft(
 ): Promise<ProviderResult<DraftResponse>> {
   const start = Date.now();
   try {
+    const ai = new GoogleGenAI({ apiKey: config.apiKey });
     const modelName = config.model ?? DEFAULT_MODEL;
-    const genAI = new GoogleGenerativeAI(config.apiKey);
-    const model = genAI.getGenerativeModel({
+
+    const response = await ai.models.generateContentStream({
       model: modelName,
-      ...(request.systemPrompt
-        ? { systemInstruction: request.systemPrompt }
-        : {}),
+      contents: request.userPrompt,
+      config: {
+        ...(request.systemPrompt
+          ? { systemInstruction: request.systemPrompt }
+          : {}),
+      },
     });
 
-    const result = await model.generateContentStream(request.userPrompt);
     let content = "";
-    for await (const chunk of result.stream) {
-      content += chunk.text();
+    let tokensIn = 0;
+    let tokensOut = 0;
+    for await (const chunk of response) {
+      content += chunk.text ?? "";
+      if (chunk.usageMetadata) {
+        tokensIn = chunk.usageMetadata.promptTokenCount ?? 0;
+        tokensOut = chunk.usageMetadata.candidatesTokenCount ?? 0;
+      }
     }
-
-    const response = await result.response;
-    const usage = response.usageMetadata;
 
     return {
       success: true,
       data: {
         content,
         model: modelName,
-        tokensIn: usage?.promptTokenCount ?? 0,
-        tokensOut: usage?.candidatesTokenCount ?? 0,
+        tokensIn,
+        tokensOut,
         durationMs: Date.now() - start,
       },
     };
@@ -65,28 +75,26 @@ async function structuredOutput<T>(
   config: ProviderConfig,
   request: StructuredRequest,
 ): Promise<ProviderResult<T>> {
+  const ai = new GoogleGenAI({ apiKey: config.apiKey });
   const modelName = config.model ?? DEFAULT_MODEL;
-  const genAI = new GoogleGenerativeAI(config.apiKey);
 
   return withStructuredRetry<T>(async (retryPrompt) => {
-    const model = genAI.getGenerativeModel({
-      model: modelName,
-      systemInstruction: request.systemPrompt,
-      generationConfig: {
-        responseMimeType: "application/json",
-        // Cast needed: our JsonSchema is a generic Record, Google SDK expects their typed Schema union
-        responseSchema: request.schema as unknown as ResponseSchema,
-      },
-    });
-
     const userContent = retryPrompt
       ? `${request.userPrompt}\n\n${retryPrompt}`
       : request.userPrompt;
 
-    const result = await model.generateContent(userContent);
-    const text = result.response.text();
+    const result = await ai.models.generateContent({
+      model: modelName,
+      contents: userContent,
+      config: {
+        systemInstruction: request.systemPrompt,
+        responseMimeType: "application/json",
+        responseJsonSchema: request.schema,
+      },
+    });
+
     // Empty text is a malformed response — return empty to trigger retry
-    return text ?? "";
+    return result.text ?? "";
   });
 }
 
@@ -94,16 +102,13 @@ async function validateKey(
   config: ProviderConfig,
 ): Promise<ProviderResult<boolean>> {
   try {
-    const modelName = config.model ?? DEFAULT_MODEL;
-    const genAI = new GoogleGenerativeAI(config.apiKey);
-    const model = genAI.getGenerativeModel({ model: modelName });
-    await model.generateContent("hi");
+    const ai = new GoogleGenAI({ apiKey: config.apiKey });
+    await ai.models.generateContent({
+      model: config.model ?? DEFAULT_MODEL,
+      contents: "hi",
+    });
     return { success: true, data: true };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    if (msg.includes("API_KEY_INVALID") || msg.includes("401")) {
-      return { success: false, error: "Invalid API key" };
-    }
     return { success: false, error: formatError(error) };
   }
 }
