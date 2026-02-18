@@ -341,6 +341,17 @@ describe("reviewPlan", () => {
     });
   });
 
+  describe("onProgress passthrough", () => {
+    it("should pass onProgress from ReviewPlanInput to PipelineConfig", async () => {
+      const input = makeDefaultInput();
+      const onProgress = vi.fn();
+      input.onProgress = onProgress;
+      await reviewPlan(input);
+
+      expect(capturedConfig.onProgress).toBe(onProgress);
+    });
+  });
+
   describe("Call wiring completeness", () => {
     it("should pass providers, synthesizer, toolName, toolDescription, and schemas unchanged", async () => {
       const input = makeDefaultInput();

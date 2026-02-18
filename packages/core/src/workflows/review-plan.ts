@@ -5,6 +5,7 @@ import type {
   ReviewPromptParams,
   SynthesisPromptParams,
 } from "../types/pipeline.js";
+import type { PipelineEvent } from "../types/pipeline-event.js";
 import type { WorkflowResult, WorkflowInput } from "../types/workflow.js";
 import { CROSS_REVIEW_SCHEMA } from "../schemas/cross-review.schema.js";
 import { SYNTHESIS_RESPONSE_SCHEMA } from "../schemas/synthesis-response.schema.js";
@@ -15,6 +16,7 @@ export interface ReviewPlanInput {
   context?: string;
   providers: ProviderWithConfig[];
   synthesizer: ProviderWithConfig;
+  onProgress?: (event: PipelineEvent) => void;
 }
 
 export async function reviewPlan(input: ReviewPlanInput): Promise<WorkflowResult> {
@@ -35,6 +37,7 @@ export async function reviewPlan(input: ReviewPlanInput): Promise<WorkflowResult
       toolName: "submit_synthesis",
       toolDescription: "Submit your structured synthesis of the deliberation",
     },
+    onProgress: input.onProgress,
   };
 
   const result = await runPipeline(config);

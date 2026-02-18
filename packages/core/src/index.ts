@@ -19,6 +19,7 @@ export type {
   WorkflowType,
   WorkflowInput,
   WorkflowResult,
+  PipelineEvent,
 } from "./types/index.js";
 
 export type {

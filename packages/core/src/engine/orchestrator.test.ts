@@ -4,6 +4,7 @@ import type { Provider, ProviderConfig, DraftResponse, ProviderResult } from "..
 import type { CrossReview } from "../types/cross-review.js";
 import type { SynthesisResponse } from "../types/synthesis-response.js";
 import type { AnonymizedResponse } from "../types/anonymizer.js";
+import type { PipelineEvent } from "../types/pipeline-event.js";
 import type {
   PipelineConfig,
   ProviderWithConfig,
@@ -471,6 +472,156 @@ describe("orchestrator", () => {
 
       expect(result.status).toBe("failed");
       expect(result.errors[0]!.error).toContain("Duplicate provider ID");
+    });
+  });
+
+  describe("onProgress events", () => {
+    it("should emit draft:started for each provider", async () => {
+      const { config } = buildHappyConfig();
+      const events: PipelineEvent[] = [];
+      config.onProgress = (e) => events.push(e);
+
+      await runPipeline(config);
+
+      const draftStarted = events.filter((e) => e.stage === "draft" && e.status === "started");
+      expect(draftStarted).toHaveLength(3);
+      const models = draftStarted.map((e) => e.model);
+      expect(models).toContain("anthropic");
+      expect(models).toContain("openai");
+      expect(models).toContain("google");
+    });
+
+    it("should emit draft:complete with response content for successful drafts", async () => {
+      const { config } = buildHappyConfig();
+      const events: PipelineEvent[] = [];
+      config.onProgress = (e) => events.push(e);
+
+      await runPipeline(config);
+
+      const draftComplete = events.filter((e) => e.stage === "draft" && e.status === "complete");
+      expect(draftComplete).toHaveLength(3);
+      for (const event of draftComplete) {
+        if (event.stage === "draft" && event.status === "complete") {
+          expect(typeof event.response).toBe("string");
+          expect(event.response.length).toBeGreaterThan(0);
+        }
+      }
+    });
+
+    it("should emit draft:failed with error for failed drafts", async () => {
+      const { config, p1, p2 } = buildHappyConfig();
+      (p1.provider.draft as ReturnType<typeof vi.fn>).mockResolvedValue(draftFailure("Anthropic down"));
+      (p2.provider.draft as ReturnType<typeof vi.fn>).mockResolvedValue(draftFailure("OpenAI down"));
+
+      const events: PipelineEvent[] = [];
+      config.onProgress = (e) => events.push(e);
+
+      await runPipeline(config);
+
+      const draftFailed = events.filter((e) => e.stage === "draft" && e.status === "failed");
+      expect(draftFailed).toHaveLength(2);
+      const failedModels = draftFailed.map((e) => e.model);
+      expect(failedModels).toContain("anthropic");
+      expect(failedModels).toContain("openai");
+      for (const event of draftFailed) {
+        if (event.stage === "draft" && event.status === "failed") {
+          expect(typeof event.error).toBe("string");
+        }
+      }
+    });
+
+    it("should emit review:started and review:complete for successful reviews", async () => {
+      const { config } = buildHappyConfig();
+      const events: PipelineEvent[] = [];
+      config.onProgress = (e) => events.push(e);
+
+      await runPipeline(config);
+
+      const reviewStarted = events.filter((e) => e.stage === "review" && e.status === "started");
+      const reviewComplete = events.filter((e) => e.stage === "review" && e.status === "complete");
+      expect(reviewStarted).toHaveLength(3);
+      expect(reviewComplete).toHaveLength(3);
+      for (const event of reviewComplete) {
+        if (event.stage === "review" && event.status === "complete") {
+          expect(event.review).toBeDefined();
+          expect(event.review.confidence).toBe(0.8);
+        }
+      }
+    });
+
+    it("should emit review:failed for failed reviews", async () => {
+      const { config, p1 } = buildHappyConfig();
+      (p1.provider.structuredOutput as ReturnType<typeof vi.fn>).mockResolvedValue(reviewFailure("Review fail"));
+
+      const events: PipelineEvent[] = [];
+      config.onProgress = (e) => events.push(e);
+
+      await runPipeline(config);
+
+      const reviewFailed = events.filter((e) => e.stage === "review" && e.status === "failed");
+      expect(reviewFailed).toHaveLength(1);
+      expect(reviewFailed[0]!.model).toBe("anthropic");
+    });
+
+    it("should emit synthesis:started and synthesis:complete", async () => {
+      const { config } = buildHappyConfig();
+      const events: PipelineEvent[] = [];
+      config.onProgress = (e) => events.push(e);
+
+      await runPipeline(config);
+
+      const synthStarted = events.filter((e) => e.stage === "synthesis" && e.status === "started");
+      const synthComplete = events.filter((e) => e.stage === "synthesis" && e.status === "complete");
+      expect(synthStarted).toHaveLength(1);
+      expect(synthComplete).toHaveLength(1);
+      if (synthComplete[0]!.stage === "synthesis" && synthComplete[0]!.status === "complete") {
+        expect(synthComplete[0]!.result.output).toBe("Synthesized response");
+      }
+    });
+
+    it("should emit events in stage monotonic order", async () => {
+      const { config } = buildHappyConfig();
+      const events: PipelineEvent[] = [];
+      config.onProgress = (e) => events.push(e);
+
+      await runPipeline(config);
+
+      // Verify monotonicity: all draft events before any review, all review before synthesis
+      const stageOrder = ["draft", "review", "synthesis"];
+      let lastStageIdx = 0;
+      for (const event of events) {
+        const idx = stageOrder.indexOf(event.stage);
+        expect(idx).toBeGreaterThanOrEqual(lastStageIdx);
+        if (idx > lastStageIdx) lastStageIdx = idx;
+      }
+      // Ensure we saw all three stages
+      expect(lastStageIdx).toBe(2);
+    });
+
+    it("should not break when onProgress is not provided", async () => {
+      const { config } = buildHappyConfig();
+      delete config.onProgress;
+
+      const result = await runPipeline(config);
+
+      expect(result.status).toBe("success");
+      expect(result.drafts.size).toBe(3);
+      expect(result.synthesis).not.toBeNull();
+    });
+
+    it("should isolate callback failures from pipeline execution", async () => {
+      const { config } = buildHappyConfig();
+      config.onProgress = () => {
+        throw new Error("callback exploded");
+      };
+
+      const result = await runPipeline(config);
+
+      // Pipeline should still succeed despite callback throwing on every event
+      expect(result.status).toBe("success");
+      expect(result.drafts.size).toBe(3);
+      expect(result.reviews.size).toBe(3);
+      expect(result.synthesis).not.toBeNull();
     });
   });
 });
