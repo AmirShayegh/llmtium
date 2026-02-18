@@ -5,6 +5,7 @@ export type {
   ResolvedDisagreement,
   ActionItem,
   SynthesisResponse,
+  AnonymizedResponse,
 } from "./types/index.js";
 
 export type {
@@ -23,3 +24,9 @@ export {
   openaiProvider,
   googleProvider,
 } from "./providers/index.js";
+
+export {
+  anonymize,
+  shuffleForReviewer,
+  deanonymize,
+} from "./engine/anonymizer.js";

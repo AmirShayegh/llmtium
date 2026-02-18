@@ -9,3 +9,5 @@ export type {
   ActionItem,
   SynthesisResponse,
 } from "./synthesis-response.js";
+
+export type { AnonymizedResponse } from "./anonymizer.js";
