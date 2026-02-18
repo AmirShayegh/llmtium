@@ -151,12 +151,13 @@ describe("anthropicProvider", () => {
     it("should return error when response has no tool_use block", async () => {
       mockCreate
         .mockResolvedValueOnce({ content: [{ type: "text", text: "no tool" }] })
-        .mockResolvedValueOnce({ content: [{ type: "text", text: "still no tool" }] });
+        .mockResolvedValueOnce({ content: [{ type: "text", text: "still no tool" }] })
+        .mockResolvedValueOnce({ content: [{ type: "text", text: "third fail" }] });
 
       const result = await provider.anthropicProvider.structuredOutput(config, structuredReq);
 
       expect(result.success).toBe(false);
-      if (!result.success) expect(result.error).toContain("Structured output failed after 2 attempts");
+      if (!result.success) expect(result.error).toContain("Structured output failed after 3 attempts");
     });
 
     it("should retry on first failure and succeed on second attempt", async () => {
@@ -174,13 +175,16 @@ describe("anthropicProvider", () => {
       expect(mockCreate).toHaveBeenCalledTimes(2);
     });
 
-    it("should return error after 2 consecutive failures", async () => {
-      mockCreate.mockRejectedValue(new MockRateLimitError());
+    it("should return error after 3 consecutive parse failures", async () => {
+      mockCreate
+        .mockResolvedValueOnce({ content: [{ type: "text", text: "bad" }] })
+        .mockResolvedValueOnce({ content: [{ type: "text", text: "bad" }] })
+        .mockResolvedValueOnce({ content: [{ type: "text", text: "bad" }] });
 
       const result = await provider.anthropicProvider.structuredOutput(config, structuredReq);
 
       expect(result.success).toBe(false);
-      if (!result.success) expect(result.error).toContain("Structured output failed after 2 attempts");
+      if (!result.success) expect(result.error).toContain("Structured output failed after 3 attempts");
     });
   });
 

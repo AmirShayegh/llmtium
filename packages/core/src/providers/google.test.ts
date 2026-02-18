@@ -161,7 +161,10 @@ describe("googleProvider", () => {
     });
 
     it("should return error when response text is empty", async () => {
-      mockGenerateContent.mockResolvedValue(makeContentResult(""));
+      mockGenerateContent
+        .mockResolvedValueOnce(makeContentResult(""))
+        .mockResolvedValueOnce(makeContentResult(""))
+        .mockResolvedValueOnce(makeContentResult(""));
 
       const result = await provider.googleProvider.structuredOutput(config, structuredReq);
 
@@ -183,15 +186,16 @@ describe("googleProvider", () => {
       if (result.success) expect(result.data.score).toBe(3);
     });
 
-    it("should return error after 2 consecutive failures", async () => {
+    it("should return error after 3 consecutive parse failures", async () => {
       mockGenerateContent
         .mockResolvedValueOnce(makeContentResult("bad"))
-        .mockResolvedValueOnce(makeContentResult("still bad"));
+        .mockResolvedValueOnce(makeContentResult("still bad"))
+        .mockResolvedValueOnce(makeContentResult("very bad"));
 
       const result = await provider.googleProvider.structuredOutput(config, structuredReq);
 
       expect(result.success).toBe(false);
-      if (!result.success) expect(result.error).toContain("Structured output failed after 2 attempts");
+      if (!result.success) expect(result.error).toContain("Structured output failed after 3 attempts");
     });
   });
 

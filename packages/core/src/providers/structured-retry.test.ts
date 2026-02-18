@@ -25,24 +25,26 @@ describe("withStructuredRetry", () => {
     expect(attemptFn).toHaveBeenNthCalledWith(2, RETRY_PROMPT);
   });
 
-  it("should return error after 2 consecutive parse failures", async () => {
+  it("should return error after 3 consecutive parse failures", async () => {
     const attemptFn = vi.fn()
       .mockResolvedValueOnce("bad json 1")
-      .mockResolvedValueOnce("bad json 2");
+      .mockResolvedValueOnce("bad json 2")
+      .mockResolvedValueOnce("bad json 3");
 
     const result = await withStructuredRetry(attemptFn);
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toContain("Structured output failed after 2 attempts");
+      expect(result.error).toContain("Structured output failed after 3 attempts");
     }
-    expect(attemptFn).toHaveBeenCalledTimes(2);
+    expect(attemptFn).toHaveBeenCalledTimes(3);
   });
 
   it("should return error if attempt function throws", async () => {
     const attemptFn = vi.fn()
       .mockRejectedValueOnce(new Error("network timeout"))
-      .mockRejectedValueOnce(new Error("network timeout again"));
+      .mockRejectedValueOnce(new Error("network timeout"))
+      .mockRejectedValueOnce(new Error("network timeout"));
 
     const result = await withStructuredRetry(attemptFn);
 
