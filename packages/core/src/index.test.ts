@@ -7,6 +7,9 @@ import {
   shuffleForReviewer,
   deanonymize,
   runPipeline,
+  reviewPlan,
+  CROSS_REVIEW_SCHEMA,
+  SYNTHESIS_RESPONSE_SCHEMA,
 } from "./index.js";
 import type {
   CrossReview,
@@ -19,6 +22,10 @@ import type {
   DraftResult,
   ReviewResult,
   ProviderWithConfig,
+  WorkflowType,
+  WorkflowInput,
+  WorkflowResult,
+  ReviewPlanInput,
 } from "./index.js";
 
 describe("@llmtium/core", () => {
@@ -151,6 +158,30 @@ describe("@llmtium/core", () => {
 
       const review: ReviewResult = { status: "failed", error: "test" };
       expect(review.status).toBe("failed");
+    });
+  });
+
+  describe("Workflow exports", () => {
+    it("should export reviewPlan, workflow types, and schemas", () => {
+      expect(typeof reviewPlan).toBe("function");
+
+      // Type-level checks: workflow types compile
+      const workflowType: WorkflowType = "review_plan";
+      expect(workflowType).toBe("review_plan");
+
+      const input: WorkflowInput = {
+        prompt: "test",
+        workflow: "review_plan",
+        models: ["anthropic/claude"],
+        synthesizer: "anthropic/claude",
+      };
+      expect(input.workflow).toBe("review_plan");
+
+      // Schemas are objects with expected structure
+      expect(typeof CROSS_REVIEW_SCHEMA).toBe("object");
+      expect(CROSS_REVIEW_SCHEMA).toHaveProperty("properties");
+      expect(typeof SYNTHESIS_RESPONSE_SCHEMA).toBe("object");
+      expect(SYNTHESIS_RESPONSE_SCHEMA).toHaveProperty("properties");
     });
   });
 });

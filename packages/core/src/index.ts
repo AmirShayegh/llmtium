@@ -16,6 +16,9 @@ export type {
   PipelineError,
   PipelineTelemetry,
   PipelineResult,
+  WorkflowType,
+  WorkflowInput,
+  WorkflowResult,
 } from "./types/index.js";
 
 export type {
@@ -42,3 +45,9 @@ export {
 } from "./engine/anonymizer.js";
 
 export { runPipeline } from "./engine/orchestrator.js";
+
+export { CROSS_REVIEW_SCHEMA } from "./schemas/cross-review.schema.js";
+export { SYNTHESIS_RESPONSE_SCHEMA } from "./schemas/synthesis-response.schema.js";
+
+export { reviewPlan } from "./workflows/review-plan.js";
+export type { ReviewPlanInput } from "./workflows/review-plan.js";
