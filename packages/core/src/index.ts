@@ -6,6 +6,16 @@ export type {
   ActionItem,
   SynthesisResponse,
   AnonymizedResponse,
+  ProviderWithConfig,
+  ReviewPromptParams,
+  SynthesisPromptParams,
+  StagePromptConfig,
+  PipelineConfig,
+  DraftResult,
+  ReviewResult,
+  PipelineError,
+  PipelineTelemetry,
+  PipelineResult,
 } from "./types/index.js";
 
 export type {
@@ -30,3 +40,5 @@ export {
   shuffleForReviewer,
   deanonymize,
 } from "./engine/anonymizer.js";
+
+export { runPipeline } from "./engine/orchestrator.js";

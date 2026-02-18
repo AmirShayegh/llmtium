@@ -6,11 +6,19 @@ import {
   anonymize,
   shuffleForReviewer,
   deanonymize,
+  runPipeline,
 } from "./index.js";
 import type {
   CrossReview,
   SynthesisResponse,
   AnonymizedResponse,
+  PipelineConfig,
+  PipelineResult,
+  PipelineError,
+  PipelineTelemetry,
+  DraftResult,
+  ReviewResult,
+  ProviderWithConfig,
 } from "./index.js";
 
 describe("@llmtium/core", () => {
@@ -127,6 +135,22 @@ describe("@llmtium/core", () => {
       // Type-level check: AnonymizedResponse compiles
       const response: AnonymizedResponse = { label: "Response A", content: "test" };
       expect(response.label).toBe("Response A");
+    });
+  });
+
+  describe("Orchestrator exports", () => {
+    it("should export runPipeline function and pipeline types", () => {
+      expect(typeof runPipeline).toBe("function");
+
+      // Type-level checks: pipeline types compile
+      const error: PipelineError = { stage: "draft", model: "test", error: "fail" };
+      expect(error.stage).toBe("draft");
+
+      const draft: DraftResult = { status: "failed", error: "test" };
+      expect(draft.status).toBe("failed");
+
+      const review: ReviewResult = { status: "failed", error: "test" };
+      expect(review.status).toBe("failed");
     });
   });
 });
