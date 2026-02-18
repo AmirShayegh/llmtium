@@ -197,6 +197,18 @@ describe("googleProvider", () => {
       expect(result.success).toBe(false);
       if (!result.success) expect(result.error).toContain("Structured output failed after 3 attempts");
     });
+
+    it("should fail immediately on API error without retrying", async () => {
+      mockGenerateContent.mockRejectedValueOnce(
+        new Error("API_KEY_INVALID: The provided API key is not valid"),
+      );
+
+      const result = await provider.googleProvider.structuredOutput(config, structuredReq);
+
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error).toBe("API_KEY_INVALID: The provided API key is not valid");
+      expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("validateKey", () => {

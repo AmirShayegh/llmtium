@@ -97,7 +97,8 @@ async function structuredOutput<T>(
       (block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
     );
     if (!toolBlock) {
-      throw new Error("No tool_use block in response");
+      // Malformed response — return non-JSON to trigger retry
+      return "NO_TOOL_USE_BLOCK";
     }
 
     return JSON.stringify(toolBlock.input);

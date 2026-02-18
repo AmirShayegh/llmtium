@@ -186,6 +186,16 @@ describe("anthropicProvider", () => {
       expect(result.success).toBe(false);
       if (!result.success) expect(result.error).toContain("Structured output failed after 3 attempts");
     });
+
+    it("should fail immediately on API error without retrying", async () => {
+      mockCreate.mockRejectedValueOnce(new MockRateLimitError());
+
+      const result = await provider.anthropicProvider.structuredOutput(config, structuredReq);
+
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error).toBe("Rate limited");
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("validateKey", () => {
