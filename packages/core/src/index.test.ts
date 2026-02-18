@@ -3,10 +3,14 @@ import {
   anthropicProvider,
   openaiProvider,
   googleProvider,
+  anonymize,
+  shuffleForReviewer,
+  deanonymize,
 } from "./index.js";
 import type {
   CrossReview,
   SynthesisResponse,
+  AnonymizedResponse,
 } from "./index.js";
 
 describe("@llmtium/core", () => {
@@ -111,6 +115,18 @@ describe("@llmtium/core", () => {
       expect(openaiProvider.meta.name).toBe("OpenAI");
       expect(googleProvider.meta.id).toBe("google");
       expect(googleProvider.meta.name).toBe("Google");
+    });
+  });
+
+  describe("Anonymizer exports", () => {
+    it("should export anonymize, shuffleForReviewer, deanonymize functions and AnonymizedResponse type", () => {
+      expect(typeof anonymize).toBe("function");
+      expect(typeof shuffleForReviewer).toBe("function");
+      expect(typeof deanonymize).toBe("function");
+
+      // Type-level check: AnonymizedResponse compiles
+      const response: AnonymizedResponse = { label: "Response A", content: "test" };
+      expect(response.label).toBe("Response A");
     });
   });
 });
