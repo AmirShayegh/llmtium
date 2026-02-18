@@ -313,14 +313,13 @@ describe("orchestrator", () => {
     });
   });
 
-  describe("provider throws", () => {
-    it("should handle a draft provider that throws an exception", async () => {
+  describe("provider throws (rejected promise)", () => {
+    it("should handle a draft provider that rejects", async () => {
       const { config, p1 } = buildHappyConfig();
       (p1.provider.draft as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("SDK exploded"));
 
       const result = await runPipeline(config);
 
-      // Pipeline should continue with remaining 2 providers
       expect(result.status).toBe("partial");
       expect(result.drafts.get("anthropic")?.status).toBe("failed");
       expect(result.drafts.get("openai")?.status).toBe("success");
@@ -329,7 +328,7 @@ describe("orchestrator", () => {
       expect(result.errors.some((e) => e.stage === "draft" && e.model === "anthropic")).toBe(true);
     });
 
-    it("should handle a review provider that throws an exception", async () => {
+    it("should handle a review provider that rejects", async () => {
       const { config, p2 } = buildHappyConfig();
       (p2.provider.structuredOutput as ReturnType<typeof vi.fn>).mockRejectedValue(
         new Error("Review SDK crash"),
@@ -341,6 +340,72 @@ describe("orchestrator", () => {
       expect(result.reviews.get("openai")?.status).toBe("failed");
       expect(result.synthesis).not.toBeNull();
       expect(result.errors.some((e) => e.stage === "review" && e.model === "openai")).toBe(true);
+    });
+  });
+
+  describe("provider throws (synchronous)", () => {
+    it("should handle a draft provider that throws synchronously", async () => {
+      const { config, p1 } = buildHappyConfig();
+      (p1.provider.draft as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error("sync boom");
+      });
+
+      const result = await runPipeline(config);
+
+      expect(result.status).toBe("partial");
+      expect(result.drafts.get("anthropic")?.status).toBe("failed");
+      expect(result.synthesis).not.toBeNull();
+      expect(result.errors.some((e) => e.stage === "draft" && e.model === "anthropic")).toBe(true);
+    });
+
+    it("should handle a review provider that throws synchronously", async () => {
+      const { config, p2 } = buildHappyConfig();
+      (p2.provider.structuredOutput as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error("sync review boom");
+      });
+
+      const result = await runPipeline(config);
+
+      expect(result.status).toBe("partial");
+      expect(result.reviews.get("openai")?.status).toBe("failed");
+      expect(result.synthesis).not.toBeNull();
+      expect(result.errors.some((e) => e.stage === "review" && e.model === "openai")).toBe(true);
+    });
+  });
+
+  describe("buildPrompt throws", () => {
+    it("should handle review buildPrompt throwing", async () => {
+      const { config } = buildHappyConfig();
+      (config.review.buildPrompt as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error("prompt boom");
+      });
+
+      const result = await runPipeline(config);
+
+      // All reviews fail because buildPrompt throws for each
+      expect(result.status).toBe("partial");
+      expect(result.synthesis).toBeNull();
+      for (const [, review] of result.reviews) {
+        expect(review.status).toBe("failed");
+      }
+      expect(result.errors.some((e) => e.stage === "review")).toBe(true);
+    });
+
+    it("should handle synthesis buildPrompt throwing", async () => {
+      const { config } = buildHappyConfig();
+      (config.synthesis.buildPrompt as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error("synth prompt boom");
+      });
+
+      const result = await runPipeline(config);
+
+      expect(result.status).toBe("partial");
+      expect(result.drafts.size).toBe(3);
+      expect(result.reviews.size).toBe(3);
+      expect(result.synthesis).toBeNull();
+      expect(result.errors.some((e) => e.stage === "synthesis" && e.error.includes("synth prompt boom"))).toBe(
+        true,
+      );
     });
   });
 
