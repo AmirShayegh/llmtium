@@ -25,6 +25,8 @@ export type {
   PipelineResult,
 } from "./pipeline.js";
 
+export type { PipelineEvent } from "./pipeline-event.js";
+
 export type {
   WorkflowType,
   WorkflowInput,

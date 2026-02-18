@@ -7,6 +7,7 @@ import type {
 import type { AnonymizedResponse } from "./anonymizer.js";
 import type { CrossReview } from "./cross-review.js";
 import type { SynthesisResponse } from "./synthesis-response.js";
+import type { PipelineEvent } from "./pipeline-event.js";
 
 export interface ProviderWithConfig {
   provider: Provider;
@@ -38,6 +39,7 @@ export interface PipelineConfig {
   synthesizer: ProviderWithConfig;
   review: StagePromptConfig<ReviewPromptParams>;
   synthesis: StagePromptConfig<SynthesisPromptParams>;
+  onProgress?: (event: PipelineEvent) => void;
 }
 
 export type DraftResult =

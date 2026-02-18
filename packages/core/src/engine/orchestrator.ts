@@ -1,6 +1,7 @@
 import type { DraftResponse, ProviderResult } from "../providers/types.js";
 import type { CrossReview } from "../types/cross-review.js";
 import type { SynthesisResponse } from "../types/synthesis-response.js";
+import type { PipelineEvent } from "../types/pipeline-event.js";
 import type {
   PipelineConfig,
   PipelineResult,
@@ -22,6 +23,11 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     return makeFailedResult([{ stage: "draft", model: "pipeline", error: validationError }]);
   }
 
+  // Failure-isolated emit — callback errors never affect pipeline behavior
+  const safeEmit = (event: PipelineEvent): void => {
+    try { config.onProgress?.(event); } catch { /* callback errors are swallowed */ }
+  };
+
   const totalStart = Date.now();
   const errors: PipelineError[] = [];
   const telemetry: PipelineTelemetry = {
@@ -32,7 +38,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
 
   // Stage 1: Parallel Draft
   const draftStart = Date.now();
-  const drafts = await runDraftStage(config, errors, telemetry);
+  const drafts = await runDraftStage(config, errors, telemetry, safeEmit);
   telemetry.stageDurationMs.draft = Date.now() - draftStart;
 
   const successfulDrafts = getSuccessfulDrafts(drafts);
@@ -61,7 +67,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
 
   // Stage 2: Cross-Review
   const reviewStart = Date.now();
-  const reviews = await runReviewStage(config, successfulDrafts, anonymized, mapping, errors);
+  const reviews = await runReviewStage(config, successfulDrafts, anonymized, mapping, errors, safeEmit);
   telemetry.stageDurationMs.review = Date.now() - reviewStart;
 
   const successfulReviews = getSuccessfulReviews(reviews);
@@ -72,7 +78,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
 
   // Stage 3: Synthesis
   const synthStart = Date.now();
-  const synthesis = await runSynthesisStage(config, anonymized, successfulReviews, errors);
+  const synthesis = await runSynthesisStage(config, anonymized, successfulReviews, errors, safeEmit);
   telemetry.stageDurationMs.synthesis = Date.now() - synthStart;
 
   telemetry.totalDurationMs = Date.now() - totalStart;
@@ -103,13 +109,15 @@ async function runDraftStage(
   config: PipelineConfig,
   errors: PipelineError[],
   telemetry: PipelineTelemetry,
+  emit: (event: PipelineEvent) => void,
 ): Promise<Map<string, DraftResult>> {
   const drafts = new Map<string, DraftResult>();
 
   const settled = await Promise.allSettled(
-    config.providers.map(async (pwc) =>
-      pwc.provider.draft(pwc.config, { userPrompt: config.prompt, systemPrompt: config.systemPrompt }),
-    ),
+    config.providers.map(async (pwc) => {
+      emit({ stage: "draft", model: pwc.provider.meta.id, status: "started" });
+      return pwc.provider.draft(pwc.config, { userPrompt: config.prompt, systemPrompt: config.systemPrompt });
+    }),
   );
 
   for (let i = 0; i < settled.length; i++) {
@@ -120,15 +128,18 @@ async function runDraftStage(
       const msg = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
       drafts.set(modelId, { status: "failed", error: msg });
       errors.push({ stage: "draft", model: modelId, error: msg });
+      emit({ stage: "draft", model: modelId, status: "failed", error: msg });
     } else if (!outcome.value.success) {
       drafts.set(modelId, { status: "failed", error: outcome.value.error });
       errors.push({ stage: "draft", model: modelId, error: outcome.value.error });
+      emit({ stage: "draft", model: modelId, status: "failed", error: outcome.value.error });
     } else {
       drafts.set(modelId, { status: "success", response: outcome.value.data });
       telemetry.draftTokens[modelId] = {
         tokensIn: outcome.value.data.tokensIn,
         tokensOut: outcome.value.data.tokensOut,
       };
+      emit({ stage: "draft", model: modelId, status: "complete", response: outcome.value.data.content });
     }
   }
 
@@ -143,6 +154,7 @@ async function runReviewStage(
   anonymized: AnonymizedResponse[],
   mapping: Map<string, string>,
   errors: PipelineError[],
+  emit: (event: PipelineEvent) => void,
 ): Promise<Map<string, ReviewResult>> {
   const reviews = new Map<string, ReviewResult>();
 
@@ -161,6 +173,8 @@ async function runReviewStage(
 
   const settled = await Promise.allSettled(
     reviewerPwcs.map(async ({ modelId, pwc }) => {
+      emit({ stage: "review", model: modelId, status: "started" });
+
       const ownLabel = modelToLabel.get(modelId);
       const othersResponses = anonymized.filter((r) => r.label !== ownLabel);
       const shuffled = shuffleForReviewer(othersResponses, modelId);
@@ -188,11 +202,14 @@ async function runReviewStage(
       const msg = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
       reviews.set(modelId, { status: "failed", error: msg });
       errors.push({ stage: "review", model: modelId, error: msg });
+      emit({ stage: "review", model: modelId, status: "failed", error: msg });
     } else if (!outcome.value.success) {
       reviews.set(modelId, { status: "failed", error: outcome.value.error });
       errors.push({ stage: "review", model: modelId, error: outcome.value.error });
+      emit({ stage: "review", model: modelId, status: "failed", error: outcome.value.error });
     } else {
       reviews.set(modelId, { status: "success", review: outcome.value.data });
+      emit({ stage: "review", model: modelId, status: "complete", review: outcome.value.data });
     }
   }
 
@@ -206,7 +223,11 @@ async function runSynthesisStage(
   anonymized: AnonymizedResponse[],
   successfulReviews: Map<string, CrossReview>,
   errors: PipelineError[],
+  emit: (event: PipelineEvent) => void,
 ): Promise<SynthesisResponse | null> {
+  const synthModelId = config.synthesizer.provider.meta.id;
+  emit({ stage: "synthesis", model: synthModelId, status: "started" });
+
   const reviewEntries = [...successfulReviews.entries()].map(([reviewerId, review]) => ({
     reviewerId,
     review,
@@ -232,15 +253,18 @@ async function runSynthesisStage(
     );
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    errors.push({ stage: "synthesis", model: config.synthesizer.provider.meta.id, error: msg });
+    errors.push({ stage: "synthesis", model: synthModelId, error: msg });
+    emit({ stage: "synthesis", model: synthModelId, status: "failed", error: msg });
     return null;
   }
 
   if (!result.success) {
-    errors.push({ stage: "synthesis", model: config.synthesizer.provider.meta.id, error: result.error });
+    errors.push({ stage: "synthesis", model: synthModelId, error: result.error });
+    emit({ stage: "synthesis", model: synthModelId, status: "failed", error: result.error });
     return null;
   }
 
+  emit({ stage: "synthesis", status: "complete", result: result.data });
   return result.data;
 }
 
