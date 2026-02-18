@@ -7,11 +7,6 @@ import {
 import type {
   CrossReview,
   SynthesisResponse,
-  ReviewScore,
-  Disagreement,
-  ResolvedDisagreement,
-  ActionItem,
-  Provider,
 } from "./index.js";
 
 describe("@llmtium/core", () => {
@@ -108,23 +103,14 @@ describe("@llmtium/core", () => {
     });
   });
 
-  describe("Provider stubs", () => {
-    it("should export three named providers", () => {
-      expect(anthropicProvider.name).toBe("anthropic");
-      expect(openaiProvider.name).toBe("openai");
-      expect(googleProvider.name).toBe("google");
-    });
-
-    it("should return not-implemented errors from stub providers", async () => {
-      const config = { apiKey: "test-key" };
-      const request = { systemPrompt: "test", userPrompt: "test" };
-
-      const result = await anthropicProvider.draft(config, request);
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe("not implemented");
-      }
+  describe("Provider exports", () => {
+    it("should export three providers with correct metadata", () => {
+      expect(anthropicProvider.meta.id).toBe("anthropic");
+      expect(anthropicProvider.meta.name).toBe("Anthropic");
+      expect(openaiProvider.meta.id).toBe("openai");
+      expect(openaiProvider.meta.name).toBe("OpenAI");
+      expect(googleProvider.meta.id).toBe("google");
+      expect(googleProvider.meta.name).toBe("Google");
     });
   });
 });

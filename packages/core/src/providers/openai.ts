@@ -1,9 +1,14 @@
 import type { Provider } from "./types.js";
 
 export const openaiProvider: Provider = {
-  name: "openai",
+  meta: { id: "openai", name: "OpenAI", defaultModel: "gpt-4o" },
   async draft(_config, _request) {
-    // TODO: implement with openai SDK
+    return { success: false, error: "not implemented" };
+  },
+  async structuredOutput(_config, _request) {
+    return { success: false, error: "not implemented" };
+  },
+  async validateKey(_config) {
     return { success: false, error: "not implemented" };
   },
 };
