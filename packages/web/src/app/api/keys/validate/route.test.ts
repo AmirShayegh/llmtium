@@ -77,4 +77,17 @@ describe("POST /api/keys/validate", () => {
     const body = await response.json();
     expect(body.error).toContain("provider");
   });
+
+  it("should return 400 for malformed JSON body", async () => {
+    const request = new Request("http://localhost/api/keys/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not valid json{{{",
+    });
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBeDefined();
+  });
 });

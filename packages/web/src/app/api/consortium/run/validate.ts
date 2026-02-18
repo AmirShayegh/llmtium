@@ -9,6 +9,10 @@ export function validateRunRequest(body: unknown): string | null {
     return "prompt is required and must be a non-empty string";
   }
 
+  if (req.context !== undefined && typeof req.context !== "string") {
+    return "context must be a string if provided";
+  }
+
   if (!Array.isArray(req.models) || req.models.length < 2) {
     return "models must be an array with at least 2 entries";
   }
@@ -28,12 +32,12 @@ export function validateRunRequest(body: unknown): string | null {
   const keys = req.apiKeys as Record<string, unknown>;
 
   for (const model of req.models as string[]) {
-    if (typeof keys[model] !== "string" || (keys[model] as string).length === 0) {
+    if (typeof keys[model] !== "string" || (keys[model] as string).trim().length === 0) {
       return `Missing or empty apiKey for provider: ${model}`;
     }
   }
 
-  if (typeof keys[req.synthesizer] !== "string" || (keys[req.synthesizer] as string).length === 0) {
+  if (typeof keys[req.synthesizer] !== "string" || (keys[req.synthesizer] as string).trim().length === 0) {
     return `Missing or empty apiKey for synthesizer: ${req.synthesizer}`;
   }
 

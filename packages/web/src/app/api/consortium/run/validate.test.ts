@@ -83,4 +83,14 @@ describe("validateRunRequest", () => {
     };
     expect(validateRunRequest(req)).toContain("apiKey");
   });
+
+  it("should return error for non-string context", () => {
+    const req = { ...validRequest(), context: 42 };
+    expect(validateRunRequest(req)).toContain("context");
+  });
+
+  it("should return error for whitespace-only apiKey", () => {
+    const req = { ...validRequest(), apiKeys: { anthropic: "sk-123", openai: "   " } };
+    expect(validateRunRequest(req)).toContain("apiKey");
+  });
 });
