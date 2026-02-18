@@ -40,28 +40,28 @@ describe("withStructuredRetry", () => {
     expect(attemptFn).toHaveBeenCalledTimes(3);
   });
 
-  it("should return error if attempt function throws", async () => {
+  it("should fail immediately on API error without retrying", async () => {
     const attemptFn = vi.fn()
-      .mockRejectedValueOnce(new Error("network timeout"))
-      .mockRejectedValueOnce(new Error("network timeout"))
-      .mockRejectedValueOnce(new Error("network timeout"));
+      .mockRejectedValueOnce(new Error("Invalid API key"));
 
     const result = await withStructuredRetry(attemptFn);
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toContain("network timeout");
+      expect(result.error).toBe("Invalid API key");
     }
+    expect(attemptFn).toHaveBeenCalledTimes(1);
   });
 
-  it("should recover if first attempt throws but second succeeds", async () => {
+  it("should propagate API error message directly", async () => {
     const attemptFn = vi.fn()
-      .mockRejectedValueOnce(new Error("transient error"))
-      .mockResolvedValueOnce('{"recovered":true}');
+      .mockRejectedValueOnce(new Error("Rate limit exceeded"));
 
-    const result = await withStructuredRetry<{ recovered: boolean }>(attemptFn);
+    const result = await withStructuredRetry(attemptFn);
 
-    expect(result).toEqual({ success: true, data: { recovered: true } });
-    expect(attemptFn).toHaveBeenCalledTimes(2);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe("Rate limit exceeded");
+    }
   });
 });

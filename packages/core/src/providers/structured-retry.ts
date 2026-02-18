@@ -11,12 +11,22 @@ export async function withStructuredRetry<T>(
   let lastError: string = "Unknown error";
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    let raw: string;
     try {
-      const raw = await attemptFn(attempt > 0 ? RETRY_PROMPT : undefined);
+      raw = await attemptFn(attempt > 0 ? RETRY_PROMPT : undefined);
+    } catch (error) {
+      // API errors (auth, rate limit, network) — fail immediately, no retry
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    try {
       const data = JSON.parse(raw) as T;
       return { success: true, data };
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
+    } catch {
+      lastError = `Invalid JSON: ${raw.slice(0, 100)}`;
     }
   }
 

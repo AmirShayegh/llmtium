@@ -85,8 +85,8 @@ async function structuredOutput<T>(
 
     const result = await model.generateContent(userContent);
     const text = result.response.text();
-    if (!text) throw new Error("Empty response text");
-    return text;
+    // Empty text is a malformed response — return empty to trigger retry
+    return text ?? "";
   });
 }
 

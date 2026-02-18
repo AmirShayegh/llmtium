@@ -98,8 +98,8 @@ async function structuredOutput<T>(
     });
 
     const content = response.choices[0]?.message?.content;
-    if (!content) throw new Error("Empty response content");
-    return content;
+    // Null/empty content is a malformed response — return empty to trigger retry
+    return content ?? "";
   });
 }
 
