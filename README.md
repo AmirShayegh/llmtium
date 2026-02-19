@@ -104,11 +104,11 @@ Monorepo with three packages sharing a core engine:
 ```
 packages/
   core/       @llmtium/core    Deliberation engine, provider adapters, schemas
-  web/        llmtium          Next.js 15 web UI (App Router, Tailwind, shadcn/ui)
+  web/        llmtium          Next.js 16 web UI (App Router, Tailwind, shadcn/ui)
   mcp/        llmtium-mcp      stdio MCP server for Claude Code / Cursor
 ```
 
-**Tech:** Next.js 15, React, Tailwind CSS, shadcn/ui, Zustand, raw provider SDKs (`@anthropic-ai/sdk`, `openai`, `@google/genai`), `@modelcontextprotocol/sdk`, pnpm workspaces, Turborepo, Vitest.
+**Tech:** Next.js 16, React, Tailwind CSS, shadcn/ui, Zustand, raw provider SDKs (`@anthropic-ai/sdk`, `openai`, `@google/genai`), `@modelcontextprotocol/sdk`, pnpm workspaces, Turborepo, Vitest.
 
 ---
 
