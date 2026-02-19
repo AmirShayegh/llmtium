@@ -24,31 +24,30 @@ Open [http://localhost:3000](http://localhost:3000). Go to Settings, add API key
 
 ### MCP Server (Claude Code / Cursor)
 
-Build the MCP package first:
+Build the MCP package, then copy the config template:
 
 ```bash
 pnpm --filter llmtium-mcp build
+cp .mcp.json.example .mcp.json
 ```
 
-Add to your `.mcp.json`:
+Edit `.mcp.json` and add your API keys (at least 2 of 3 required). This file is gitignored -- your keys will never be committed.
 
-```json
-{
-  "mcpServers": {
-    "llmtium": {
-      "command": "node",
-      "args": ["./packages/mcp/dist/index.js"],
-      "env": {
-        "ANTHROPIC_API_KEY": "your-key",
-        "OPENAI_API_KEY": "your-key",
-        "GOOGLE_API_KEY": "your-key"
-      }
-    }
-  }
-}
-```
+> **Note:** Restart Claude Code after editing `.mcp.json` for the MCP server to pick up the new keys.
 
-Then in Claude Code, ask it to review a plan with the consortium. It calls `consortium.review_plan`, gets multi-LLM synthesis, and uses the result directly.
+**Available tools:**
+
+| Tool | Description |
+|---|---|
+| `consortium.review_plan` | Send a plan for multi-LLM review, cross-reference, and synthesis |
+| `consortium.deliberate` | Send a prompt for multi-LLM analysis, cross-review, and synthesis |
+
+Both tools accept optional `models` (array of provider IDs) and `synthesizer` (provider ID, default: anthropic) parameters.
+
+**Troubleshooting:**
+
+- **"Need at least 2 providers with API keys configured"** -- Add valid API keys for at least 2 of: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY` in your `.mcp.json` env block.
+- **Tool not found** -- Run `pnpm --filter llmtium-mcp build` and restart Claude Code.
 
 ---
 
@@ -117,11 +116,12 @@ packages/
 ```bash
 git clone https://github.com/AmirShayegh/llmtium.git
 cd llmtium
-cp .env.example .env   # Add your API keys (optional, only needed for MCP)
 pnpm install
 pnpm build
 pnpm dev               # http://localhost:3000
 ```
+
+Add your API keys in the web UI (Settings page). For MCP server setup, see [MCP Server](#mcp-server-claude-code--cursor) above.
 
 When self-hosted, your API keys never leave your machine. The browser talks to localhost, which calls LLM APIs directly.
 
@@ -131,7 +131,7 @@ When self-hosted, your API keys never leave your machine. The browser talks to l
 
 1. Fork the repo and create a feature branch
 2. `pnpm install`
-3. `pnpm test` (246 tests across all packages)
+3. `pnpm test` (runs the full suite)
 4. `pnpm build`
 5. Submit a PR
 

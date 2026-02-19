@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "llmtium": {
+      "command": "node",
+      "args": ["./packages/mcp/dist/index.js"],
+      "env": {
+        "ANTHROPIC_API_KEY": "your-anthropic-api-key",
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "GOOGLE_API_KEY": "your-google-api-key"
+      }
+    }
+  }
+}

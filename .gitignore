@@ -10,6 +10,7 @@ out/
 .env
 .env.local
 .env.*.local
+.mcp.json
 
 # IDE
 .vscode/
