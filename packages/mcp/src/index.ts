@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
-// TODO: implement stdio MCP server with @modelcontextprotocol/sdk
-// Will expose consortium.review_plan as the lead tool
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { createServer } from "./server.js";
 
-console.error("llmtium-mcp: not yet implemented");
-process.exit(1);
+const server = createServer();
+const transport = new StdioServerTransport();
+await server.connect(transport);
