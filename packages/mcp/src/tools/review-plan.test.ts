@@ -168,6 +168,25 @@ describe("handleReviewPlan", () => {
       expect(mockReviewPlan).not.toHaveBeenCalled();
     });
 
+    it("should return error when models is an empty array", async () => {
+      const result = await handleReviewPlan({ plan: "Test plan", models: [] });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0]!.text).toContain("must not be empty");
+      expect(mockReviewPlan).not.toHaveBeenCalled();
+    });
+
+    it("should treat whitespace-only API keys as missing", async () => {
+      vi.stubEnv("OPENAI_API_KEY", "   ");
+      vi.stubEnv("GOOGLE_API_KEY", " \t ");
+
+      const result = await handleReviewPlan({ plan: "Test plan" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0]!.text).toContain("at least 2");
+      expect(mockReviewPlan).not.toHaveBeenCalled();
+    });
+
     it("should return error when requested model has no API key", async () => {
       vi.stubEnv("GOOGLE_API_KEY", "");
 

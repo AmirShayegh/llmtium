@@ -19,6 +19,11 @@ const PROVIDER_REGISTRY: Record<string, { provider: typeof anthropicProvider; en
   google: { provider: googleProvider, envKey: "GOOGLE_API_KEY" },
 };
 
+function getEnvKey(envKey: string): string | undefined {
+  const val = process.env[envKey]?.trim();
+  return val || undefined;
+}
+
 function errorResult(text: string): ToolResult {
   return { content: [{ type: "text", text }], isError: true };
 }
@@ -41,7 +46,10 @@ export async function handleReviewPlan(input: HandleReviewPlanInput): Promise<To
     // Resolve providers
     let providerConfigs: ProviderWithConfig[];
 
-    if (requestedModels && requestedModels.length > 0) {
+    if (requestedModels !== undefined) {
+      if (requestedModels.length === 0) {
+        return errorResult("models array must not be empty. Omit the parameter to use all available providers.");
+      }
       // Validate and resolve requested models
       const uniqueModels = [...new Set(requestedModels)];
       const missing: string[] = [];
@@ -51,8 +59,7 @@ export async function handleReviewPlan(input: HandleReviewPlanInput): Promise<To
         if (!entry) {
           return errorResult(`Unknown provider: ${id}. Valid providers: ${Object.keys(PROVIDER_REGISTRY).join(", ")}`);
         }
-        const key = process.env[entry.envKey];
-        if (!key) {
+        if (!getEnvKey(entry.envKey)) {
           missing.push(`${id} (${entry.envKey})`);
         }
       }
@@ -65,14 +72,14 @@ export async function handleReviewPlan(input: HandleReviewPlanInput): Promise<To
         const entry = PROVIDER_REGISTRY[id]!;
         return {
           provider: entry.provider,
-          config: { apiKey: process.env[entry.envKey]! },
+          config: { apiKey: getEnvKey(entry.envKey)! },
         };
       });
     } else {
       // Use all providers with env keys set
       providerConfigs = [];
       for (const [, entry] of Object.entries(PROVIDER_REGISTRY)) {
-        const key = process.env[entry.envKey];
+        const key = getEnvKey(entry.envKey);
         if (key) {
           providerConfigs.push({
             provider: entry.provider,
@@ -95,7 +102,7 @@ export async function handleReviewPlan(input: HandleReviewPlanInput): Promise<To
     if (!synthEntry) {
       return errorResult(`Unknown synthesizer: ${synthesizerId}. Valid providers: ${Object.keys(PROVIDER_REGISTRY).join(", ")}`);
     }
-    const synthKey = process.env[synthEntry.envKey];
+    const synthKey = getEnvKey(synthEntry.envKey);
     if (!synthKey) {
       return errorResult(`Missing API key for synthesizer ${synthesizerId} (${synthEntry.envKey})`);
     }
