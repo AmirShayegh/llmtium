@@ -42,7 +42,7 @@ export interface ConsortiumState {
 
   setWorkflow: (workflow: WorkflowType) => void;
   handleEvent: (event: Record<string, unknown>) => void;
-  startRun: (prompt: string, models: string[], synthesizer: string, workflow: WorkflowType) => Promise<void>;
+  startRun: (prompt: string, models: string[], synthesizer: string, workflow: WorkflowType, modelOverrides?: Record<string, string>) => Promise<void>;
   reset: () => void;
 }
 
@@ -269,7 +269,7 @@ export function createConsortiumStore(options?: ConsortiumStoreOptions) {
       set({ workflow });
     },
 
-    startRun: async (prompt: string, models: string[], synthesizer: string, workflow: WorkflowType) => {
+    startRun: async (prompt: string, models: string[], synthesizer: string, workflow: WorkflowType, modelOverrides?: Record<string, string>) => {
       // Abort prior run
       if (_abortController) {
         _abortController.abort();
@@ -308,7 +308,7 @@ export function createConsortiumStore(options?: ConsortiumStoreOptions) {
 
         const stream = parseSSE({
           url: "/api/consortium/run",
-          body: { prompt, models, synthesizer, workflow, apiKeys },
+          body: { prompt, models, synthesizer, workflow, apiKeys, ...(modelOverrides && Object.keys(modelOverrides).length > 0 ? { modelOverrides } : {}) },
           signal: _abortController.signal,
           fetcher,
         });

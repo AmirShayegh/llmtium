@@ -8,12 +8,14 @@ export interface ProviderKeyState {
   encryptedKey: string | null;
   status: KeyStatus;
   error?: string;
+  model?: string;
 }
 
 export interface KeysState {
   providers: Record<string, ProviderKeyState>;
   setEncryptedKey: (providerId: string, encryptedKey: string) => void;
   setStatus: (providerId: string, status: KeyStatus, error?: string) => void;
+  setModel: (providerId: string, model: string | undefined) => void;
   removeKey: (providerId: string) => void;
   getKeys: () => Promise<Record<string, string>>;
   hasValidKeys: () => boolean;
@@ -70,6 +72,17 @@ export function createKeysStore(storage?: PersistStorage) {
                 ...state.providers[providerId],
                 status,
                 error,
+              },
+            },
+          })),
+
+        setModel: (providerId, model) =>
+          set((state) => ({
+            providers: {
+              ...state.providers,
+              [providerId]: {
+                ...state.providers[providerId],
+                model,
               },
             },
           })),

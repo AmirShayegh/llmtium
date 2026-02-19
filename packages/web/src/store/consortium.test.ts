@@ -552,6 +552,65 @@ describe("consortium store", () => {
       expect(s.getState().runStatus).toBe("error");
       expect(s.getState().errorMessage).toBe("Stream ended unexpectedly");
     });
+
+    it("should include modelOverrides in fetch body when provided", async () => {
+      const doneEvent = JSON.stringify({ stage: "done", status: "complete", result: { status: "success" } });
+      const mockFetcher = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(`data: ${doneEvent}\n\n`));
+            controller.close();
+          },
+        }),
+      } as unknown as Response);
+
+      const s = createConsortiumStore({
+        fetcher: mockFetcher,
+        getKeys: async () => ({ anthropic: "sk-ant", openai: "sk-oai" }),
+      });
+
+      await s.getState().startRun("test", ["anthropic", "openai"], "anthropic", "general", { anthropic: "claude-sonnet-4-6" });
+
+      expect(mockFetcher).toHaveBeenCalledWith(
+        "/api/consortium/run",
+        expect.objectContaining({
+          body: JSON.stringify({
+            prompt: "test",
+            models: ["anthropic", "openai"],
+            synthesizer: "anthropic",
+            workflow: "general",
+            apiKeys: { anthropic: "sk-ant", openai: "sk-oai" },
+            modelOverrides: { anthropic: "claude-sonnet-4-6" },
+          }),
+        }),
+      );
+    });
+
+    it("should omit modelOverrides from fetch body when not provided", async () => {
+      const doneEvent = JSON.stringify({ stage: "done", status: "complete", result: { status: "success" } });
+      const mockFetcher = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(`data: ${doneEvent}\n\n`));
+            controller.close();
+          },
+        }),
+      } as unknown as Response);
+
+      const s = createConsortiumStore({
+        fetcher: mockFetcher,
+        getKeys: async () => ({ anthropic: "sk-ant", openai: "sk-oai" }),
+      });
+
+      await s.getState().startRun("test", ["anthropic", "openai"], "anthropic", "general");
+
+      const body = JSON.parse(mockFetcher.mock.calls[0]![1].body as string);
+      expect(body.modelOverrides).toBeUndefined();
+    });
   });
 
   describe("mergeErrors via done handler", () => {

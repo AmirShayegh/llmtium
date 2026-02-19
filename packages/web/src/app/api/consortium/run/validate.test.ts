@@ -113,4 +113,40 @@ describe("validateRunRequest", () => {
     const req = { ...validRequest(), workflow: 42 };
     expect(validateRunRequest(req)).toContain("workflow");
   });
+
+  describe("modelOverrides", () => {
+    it("should return null when modelOverrides is omitted", () => {
+      expect(validateRunRequest(validRequest())).toBeNull();
+    });
+
+    it("should return null for valid modelOverrides", () => {
+      const req = { ...validRequest(), modelOverrides: { anthropic: "claude-sonnet-4-6" } };
+      expect(validateRunRequest(req)).toBeNull();
+    });
+
+    it("should return error when modelOverrides is not an object", () => {
+      const req = { ...validRequest(), modelOverrides: "bad" };
+      expect(validateRunRequest(req)).toContain("modelOverrides");
+    });
+
+    it("should return error when modelOverrides is an array", () => {
+      const req = { ...validRequest(), modelOverrides: ["bad"] };
+      expect(validateRunRequest(req)).toContain("modelOverrides");
+    });
+
+    it("should return error for unknown provider in modelOverrides", () => {
+      const req = { ...validRequest(), modelOverrides: { unknown: "some-model" } };
+      expect(validateRunRequest(req)).toContain("unknown");
+    });
+
+    it("should return error for empty string value in modelOverrides", () => {
+      const req = { ...validRequest(), modelOverrides: { anthropic: "" } };
+      expect(validateRunRequest(req)).toContain("non-empty");
+    });
+
+    it("should return error for non-string value in modelOverrides", () => {
+      const req = { ...validRequest(), modelOverrides: { anthropic: 42 } };
+      expect(validateRunRequest(req)).toContain("non-empty");
+    });
+  });
 });

@@ -244,4 +244,30 @@ describe("POST /api/consortium/run", () => {
       expect(json.error).toContain("workflow");
     });
   });
+
+  describe("modelOverrides", () => {
+    it("should pass modelOverrides to workflow function via provider config", async () => {
+      mockGeneral.mockResolvedValue(mockWorkflowResult());
+      const body = {
+        ...validBody(),
+        workflow: "general",
+        modelOverrides: { anthropic: "claude-sonnet-4-6" },
+      };
+      const response = await POST(makeRequest(body));
+      await response.text();
+
+      expect(mockGeneral).toHaveBeenCalledTimes(1);
+      const callArgs = mockGeneral.mock.calls[0]![0] as GeneralInput;
+      // The anthropic provider should have config.model set
+      const anthropicProvider = callArgs.providers.find(
+        (p) => p.provider.meta.id === "anthropic",
+      );
+      expect(anthropicProvider?.config.model).toBe("claude-sonnet-4-6");
+      // OpenAI should have no model override
+      const openaiProvider = callArgs.providers.find(
+        (p) => p.provider.meta.id === "openai",
+      );
+      expect(openaiProvider?.config.model).toBeUndefined();
+    });
+  });
 });

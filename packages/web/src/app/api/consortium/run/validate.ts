@@ -48,5 +48,18 @@ export function validateRunRequest(body: unknown): string | null {
     return `Missing or empty apiKey for synthesizer: ${req.synthesizer}`;
   }
 
+  if (req.modelOverrides !== undefined) {
+    if (!req.modelOverrides || typeof req.modelOverrides !== "object" || Array.isArray(req.modelOverrides)) {
+      return "modelOverrides must be an object if provided";
+    }
+    const overrides = req.modelOverrides as Record<string, unknown>;
+    for (const [key, value] of Object.entries(overrides)) {
+      if (!VALID_PROVIDERS.has(key)) return `Unknown provider in modelOverrides: ${key}`;
+      if (typeof value !== "string" || value.trim().length === 0) {
+        return `modelOverrides values must be non-empty strings, got invalid value for: ${key}`;
+      }
+    }
+  }
+
   return null;
 }

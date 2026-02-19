@@ -21,6 +21,13 @@ function selectConfiguredKeys(s: { providers: Record<string, { encryptedKey: str
     .join(",");
 }
 
+function selectModelOverrides(s: { providers: Record<string, { model?: string }> }) {
+  return Object.entries(s.providers)
+    .filter(([, p]) => p.model)
+    .map(([id, p]) => `${id}:${p.model}`)
+    .join(",");
+}
+
 const WORKFLOW_OPTIONS: { value: WorkflowType; label: string; placeholder: string }[] = [
   { value: "general", label: "General", placeholder: "Enter your prompt for deliberation..." },
   { value: "review_plan", label: "Plan Review", placeholder: "Enter your plan for review..." },
@@ -45,6 +52,17 @@ export function ConsortiumInput({ store }: ConsortiumInputProps) {
   );
   const hasValid = configuredIds.length >= 2;
 
+  const modelOverridesStr = useStore(keysStore, selectModelOverrides);
+  const modelOverrides = useMemo(() => {
+    if (!modelOverridesStr) return undefined;
+    const result: Record<string, string> = {};
+    for (const pair of modelOverridesStr.split(",")) {
+      const idx = pair.indexOf(":");
+      if (idx > 0) result[pair.slice(0, idx)] = pair.slice(idx + 1);
+    }
+    return Object.keys(result).length > 0 ? result : undefined;
+  }, [modelOverridesStr]);
+
   useEffect(() => {
     initCrypto(localStorage);
     setReady(true); // eslint-disable-line react-hooks/set-state-in-effect -- one-time client-only init
@@ -56,8 +74,8 @@ export function ConsortiumInput({ store }: ConsortiumInputProps) {
     const synthesizer = configuredIds.includes("anthropic")
       ? "anthropic"
       : configuredIds[0]!;
-    startRun(prompt.trim(), configuredIds, synthesizer, workflow);
-  }, [prompt, hasValid, runStatus, configuredIds, startRun, workflow]);
+    startRun(prompt.trim(), configuredIds, synthesizer, workflow, modelOverrides);
+  }, [prompt, hasValid, runStatus, configuredIds, startRun, workflow, modelOverrides]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -107,6 +125,10 @@ export function ConsortiumInput({ store }: ConsortiumInputProps) {
         <div className="flex items-center gap-3">
           {Object.entries(PROVIDER_META).map(([id, meta]) => {
             const configured = configuredIds.includes(id);
+            const override = modelOverrides?.[id];
+            const modelLabel = override
+              ? (meta.models.find((m) => m.id === override)?.label ?? override)
+              : null;
             return (
               <span
                 key={id}
@@ -120,6 +142,9 @@ export function ConsortiumInput({ store }: ConsortiumInputProps) {
                   }`}
                 />
                 {meta.name}
+                {modelLabel && (
+                  <span className="text-muted-foreground">({modelLabel})</span>
+                )}
               </span>
             );
           })}

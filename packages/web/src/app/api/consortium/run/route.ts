@@ -15,6 +15,7 @@ interface RunRequest {
   models: string[];
   synthesizer: string;
   apiKeys: Record<string, string>;
+  modelOverrides?: Record<string, string>;
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -37,11 +38,12 @@ export async function POST(request: Request): Promise<Response> {
   const workflow = req.workflow ?? "review_plan";
 
   const providers = req.models.map((id) =>
-    toProviderWithConfig(id, req.apiKeys[id]!),
+    toProviderWithConfig(id, req.apiKeys[id]!, req.modelOverrides?.[id]),
   );
   const synthesizer = toProviderWithConfig(
     req.synthesizer,
     req.apiKeys[req.synthesizer]!,
+    req.modelOverrides?.[req.synthesizer],
   );
 
   const encoder = new TextEncoder();

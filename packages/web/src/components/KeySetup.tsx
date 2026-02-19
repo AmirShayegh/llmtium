@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { initCrypto, encrypt } from "@/lib/crypto";
 import { getKeysStore } from "@/store/keys";
+import { PROVIDER_META } from "@/lib/provider-meta";
 import type { KeyStatus } from "@/store/keys";
 
-const PROVIDERS = [
-  { id: "anthropic", name: "Anthropic", placeholder: "sk-ant-..." },
-  { id: "openai", name: "OpenAI", placeholder: "sk-..." },
-  { id: "google", name: "Google", placeholder: "AI..." },
-] as const;
+const PROVIDER_PLACEHOLDERS: Record<string, string> = {
+  anthropic: "sk-ant-...",
+  openai: "sk-...",
+  google: "AI...",
+};
 
 const store = getKeysStore();
 
@@ -31,7 +32,93 @@ function StatusDot({ status }: { status: KeyStatus }) {
   }
 }
 
-function ProviderRow({ id, name, placeholder }: { id: string; name: string; placeholder: string }) {
+function ModelSelector({ id }: { id: string }) {
+  const model = useStore(store, (s) => s.providers[id]?.model);
+  const setModel = useStore(store, (s) => s.setModel);
+  const [customInput, setCustomInput] = useState("");
+  const [showCustom, setShowCustom] = useState(false);
+
+  const meta = PROVIDER_META[id];
+  if (!meta) return null;
+
+  const presets = meta.models;
+  const isCustom = showCustom || (model !== undefined && !presets.some((p) => p.id === model));
+
+  const handleSelect = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const value = e.target.value;
+      if (value === "__custom__") {
+        setShowCustom(true);
+        setCustomInput(model ?? "");
+      } else if (value === meta.defaultModel) {
+        setModel(id, undefined);
+        setShowCustom(false);
+        setCustomInput("");
+      } else {
+        setModel(id, value);
+        setShowCustom(false);
+        setCustomInput("");
+      }
+    },
+    [id, meta.defaultModel, model, setModel],
+  );
+
+  const commitCustom = useCallback(() => {
+    const trimmed = customInput.trim();
+    if (trimmed) {
+      setModel(id, trimmed);
+    } else {
+      setModel(id, undefined);
+      setShowCustom(false);
+    }
+  }, [id, customInput, setModel]);
+
+  const handleCustomKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commitCustom();
+      }
+    },
+    [commitCustom],
+  );
+
+  const selectValue = isCustom ? "__custom__" : (model ?? meta.defaultModel);
+
+  return (
+    <div className="flex items-center gap-2 pl-4">
+      <label className="text-xs text-muted-foreground whitespace-nowrap">Model</label>
+      <select
+        value={selectValue}
+        onChange={handleSelect}
+        className="h-7 rounded border border-border bg-background px-2 text-xs text-foreground"
+      >
+        {presets.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.label}{p.id === meta.defaultModel ? " (default)" : ""}
+          </option>
+        ))}
+        <option value="__custom__">Custom...</option>
+      </select>
+      {isCustom && (
+        <Input
+          type="text"
+          placeholder="model-id"
+          value={customInput}
+          onChange={(e) => setCustomInput(e.target.value)}
+          onBlur={commitCustom}
+          onKeyDown={handleCustomKeyDown}
+          className="h-7 flex-1 font-mono text-xs"
+        />
+      )}
+    </div>
+  );
+}
+
+function ProviderRow({ id }: { id: string }) {
+  const meta = PROVIDER_META[id]!;
+  const placeholder = PROVIDER_PLACEHOLDERS[id] ?? "API key...";
+
   const providerState = useStore(store, (s) => s.providers[id]!);
   const setEncryptedKey = useStore(store, (s) => s.setEncryptedKey);
   const setStatus = useStore(store, (s) => s.setStatus);
@@ -109,7 +196,7 @@ function ProviderRow({ id, name, placeholder }: { id: string; name: string; plac
       <div className="flex items-center gap-2">
         <StatusDot status={providerState.status} />
         <Label className="font-mono text-sm font-medium text-foreground">
-          {name}
+          {meta.name}
         </Label>
         {isConfigured && !input && (
           <span className="ml-auto text-xs text-muted-foreground">
@@ -152,6 +239,7 @@ function ProviderRow({ id, name, placeholder }: { id: string; name: string; plac
       {providerState.status === "invalid" && providerState.error && (
         <p className="text-xs text-destructive">{providerState.error}</p>
       )}
+      {isConfigured && <ModelSelector id={id} />}
     </div>
   );
 }
@@ -168,8 +256,8 @@ export function KeySetup() {
 
   return (
     <div className="space-y-8">
-      {PROVIDERS.map((p) => (
-        <ProviderRow key={p.id} id={p.id} name={p.name} placeholder={p.placeholder} />
+      {Object.keys(PROVIDER_META).map((id) => (
+        <ProviderRow key={id} id={id} />
       ))}
     </div>
   );

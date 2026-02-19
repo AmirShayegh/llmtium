@@ -75,6 +75,49 @@ describe("keys store", () => {
     expect(state.providers.anthropic!.status).toBe("untested");
   });
 
+  describe("setModel", () => {
+    it("should set model override for a provider", () => {
+      store.getState().setModel("anthropic", "claude-sonnet-4-6");
+
+      expect(store.getState().providers.anthropic!.model).toBe("claude-sonnet-4-6");
+    });
+
+    it("should clear model override when set to undefined", () => {
+      store.getState().setModel("anthropic", "claude-sonnet-4-6");
+      store.getState().setModel("anthropic", undefined);
+
+      expect(store.getState().providers.anthropic!.model).toBeUndefined();
+    });
+
+    it("should not affect other provider fields", async () => {
+      const enc = await encrypt("sk-ant-secret");
+      store.getState().setEncryptedKey("anthropic", enc);
+      store.getState().setStatus("anthropic", "valid");
+      store.getState().setModel("anthropic", "claude-sonnet-4-6");
+
+      const state = store.getState();
+      expect(state.providers.anthropic!.encryptedKey).toBe(enc);
+      expect(state.providers.anthropic!.status).toBe("valid");
+      expect(state.providers.anthropic!.model).toBe("claude-sonnet-4-6");
+    });
+
+    it("should be cleared by removeKey", async () => {
+      const enc = await encrypt("sk-ant-secret");
+      store.getState().setEncryptedKey("anthropic", enc);
+      store.getState().setModel("anthropic", "claude-sonnet-4-6");
+      store.getState().removeKey("anthropic");
+
+      expect(store.getState().providers.anthropic!.model).toBeUndefined();
+    });
+
+    it("should persist across store re-creation", () => {
+      store.getState().setModel("openai", "gpt-4.1");
+
+      const store2 = createKeysStore(storage);
+      expect(store2.getState().providers.openai!.model).toBe("gpt-4.1");
+    });
+  });
+
   describe("hasValidKeys", () => {
     it("should return true with 2+ configured providers", async () => {
       const enc1 = await encrypt("key1");
