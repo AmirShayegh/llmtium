@@ -1,17 +1,24 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useStore } from "zustand";
 import Link from "next/link";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { initCrypto } from "@/lib/crypto";
-import { createKeysStore } from "@/store/keys";
+import { getKeysStore } from "@/store/keys";
 import { PROVIDER_META } from "@/lib/provider-meta";
 import type { ConsortiumState } from "@/store/consortium";
 import type { StoreApi } from "zustand";
 
-const keysStore = createKeysStore();
+const keysStore = getKeysStore();
+
+function selectConfiguredKeys(s: { providers: Record<string, { encryptedKey: string | null }> }) {
+  return Object.entries(s.providers)
+    .filter(([, p]) => p.encryptedKey !== null)
+    .map(([id]) => id)
+    .join(",");
+}
 
 interface ConsortiumInputProps {
   store: StoreApi<ConsortiumState>;
@@ -23,8 +30,12 @@ export function ConsortiumInput({ store }: ConsortiumInputProps) {
 
   const runStatus = useStore(store, (s) => s.runStatus);
   const startRun = useStore(store, (s) => s.startRun);
-  const configuredIds = useStore(keysStore, (s) => s.getConfiguredProviderIds());
-  const hasValid = useStore(keysStore, (s) => s.hasValidKeys());
+  const configuredKeysStr = useStore(keysStore, selectConfiguredKeys);
+  const configuredIds = useMemo(
+    () => (configuredKeysStr ? configuredKeysStr.split(",") : []),
+    [configuredKeysStr],
+  );
+  const hasValid = configuredIds.length >= 2;
 
   useEffect(() => {
     initCrypto(localStorage);

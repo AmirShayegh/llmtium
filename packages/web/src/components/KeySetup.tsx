@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { initCrypto, encrypt } from "@/lib/crypto";
-import { createKeysStore } from "@/store/keys";
+import { getKeysStore } from "@/store/keys";
 import type { KeyStatus } from "@/store/keys";
 
 const PROVIDERS = [
@@ -15,7 +15,7 @@ const PROVIDERS = [
   { id: "google", name: "Google", placeholder: "AI..." },
 ] as const;
 
-const store = createKeysStore();
+const store = getKeysStore();
 
 function StatusDot({ status }: { status: KeyStatus }) {
   const base = "inline-block h-2 w-2 rounded-full";

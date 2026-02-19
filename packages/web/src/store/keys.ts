@@ -36,6 +36,15 @@ interface PersistStorage {
   removeItem(key: string): void;
 }
 
+let sharedStore: ReturnType<typeof createKeysStore> | null = null;
+
+export function getKeysStore() {
+  if (!sharedStore) {
+    sharedStore = createKeysStore();
+  }
+  return sharedStore;
+}
+
 export function createKeysStore(storage?: PersistStorage) {
   return createStore<KeysState>()(
     persist(

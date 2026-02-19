@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { initCrypto, resetCrypto, encrypt } from "@/lib/crypto";
-import { createKeysStore } from "./keys";
+import { createKeysStore, getKeysStore } from "./keys";
 import type { KeysState } from "./keys";
 import type { StoreApi } from "zustand";
 
@@ -124,6 +124,23 @@ describe("keys store", () => {
     expect(keys).toEqual({
       anthropic: "sk-ant-secret",
       openai: "sk-oai-secret",
+    });
+  });
+
+  describe("getKeysStore singleton", () => {
+    it("should return the same instance on repeated calls", () => {
+      const a = getKeysStore();
+      const b = getKeysStore();
+      expect(a).toBe(b);
+    });
+
+    it("should share state across calls", async () => {
+      const s1 = getKeysStore();
+      const enc = await encrypt("singleton-test");
+      s1.getState().setEncryptedKey("anthropic", enc);
+
+      const s2 = getKeysStore();
+      expect(s2.getState().providers.anthropic!.encryptedKey).toBe(enc);
     });
   });
 

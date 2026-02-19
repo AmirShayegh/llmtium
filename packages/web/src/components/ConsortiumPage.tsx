@@ -9,9 +9,9 @@ import { ResponseTabs } from "@/components/ResponseTabs";
 import { ReviewDisplay } from "@/components/ReviewDisplay";
 import { SynthesisView } from "@/components/SynthesisView";
 import { createConsortiumStore } from "@/store/consortium";
-import { createKeysStore } from "@/store/keys";
+import { getKeysStore } from "@/store/keys";
 
-const keysStore = createKeysStore();
+const keysStore = getKeysStore();
 
 const consortiumStore = createConsortiumStore({
   getKeys: () => keysStore.getState().getKeys(),
