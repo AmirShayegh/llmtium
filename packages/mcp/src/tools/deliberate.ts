@@ -1,4 +1,4 @@
-import { reviewPlan } from "@llmtium/core";
+import { general } from "@llmtium/core";
 import { formatWorkflowResult } from "../format.js";
 import {
   resolveProviders,
@@ -10,16 +10,16 @@ import {
 } from "./shared.js";
 import type { ToolResult } from "./shared.js";
 
-interface HandleReviewPlanInput {
-  plan: string;
+interface HandleDeliberateInput {
+  prompt: string;
   context?: string;
   models?: string[];
   synthesizer?: string;
 }
 
-export async function handleReviewPlan(input: HandleReviewPlanInput): Promise<ToolResult> {
+export async function handleDeliberate(input: HandleDeliberateInput): Promise<ToolResult> {
   try {
-    const { plan, context, models: requestedModels, synthesizer: requestedSynthesizer } = input;
+    const { prompt, context, models: requestedModels, synthesizer: requestedSynthesizer } = input;
 
     const providers = resolveProviders(requestedModels);
     if (isError(providers)) return providers;
@@ -34,8 +34,8 @@ export async function handleReviewPlan(input: HandleReviewPlanInput): Promise<To
     const synthesizer = resolveSynthesizer(requestedSynthesizer);
     if (isError(synthesizer)) return synthesizer;
 
-    const result = await reviewPlan({
-      plan,
+    const result = await general({
+      prompt,
       context,
       providers,
       synthesizer,

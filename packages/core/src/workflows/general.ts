@@ -10,18 +10,18 @@ import { runPipeline } from "../engine/orchestrator.js";
 import { buildReviewPrompt, buildSynthesisPrompt } from "./shared-prompts.js";
 import { toWorkflowResult } from "./workflow-result.js";
 
-export interface ReviewPlanInput {
-  plan: string;
+export interface GeneralInput {
+  prompt: string;
   context?: string;
   providers: ProviderWithConfig[];
   synthesizer: ProviderWithConfig;
   onProgress?: (event: PipelineEvent) => void;
 }
 
-export async function reviewPlan(input: ReviewPlanInput): Promise<WorkflowResult> {
+export async function general(input: GeneralInput): Promise<WorkflowResult> {
   const config: PipelineConfig = {
-    prompt: buildDraftUserPrompt(input.plan, input.context),
-    systemPrompt: REVIEW_PLAN_SYSTEM_PROMPT,
+    prompt: buildDraftUserPrompt(input.prompt, input.context),
+    systemPrompt: GENERAL_SYSTEM_PROMPT,
     providers: input.providers,
     synthesizer: input.synthesizer,
     review: {
@@ -41,30 +41,29 @@ export async function reviewPlan(input: ReviewPlanInput): Promise<WorkflowResult
 
   const result = await runPipeline(config);
   return toWorkflowResult(
-    { prompt: input.plan, context: input.context, workflow: "review_plan", providers: input.providers, synthesizer: input.synthesizer },
+    { prompt: input.prompt, context: input.context, workflow: "general", providers: input.providers, synthesizer: input.synthesizer },
     result,
   );
 }
 
 // --- Prompt Constants ---
 
-const REVIEW_PLAN_SYSTEM_PROMPT = `You are an expert technical reviewer. A user has submitted a plan for review. Analyze this plan thoroughly and provide your independent assessment.
+const GENERAL_SYSTEM_PROMPT = `You are an expert analyst participating in a multi-perspective deliberation. A user has submitted a prompt for analysis by multiple independent experts. Provide your thorough, independent response.
 
 Focus on:
-- Feasibility: Can this actually be built as described?
-- Completeness: What's missing or underspecified?
-- Risks: What could go wrong? What are the biggest unknowns?
-- Sequencing: Is the order of operations correct? Are there dependencies?
-- Alternatives: Are there better approaches the plan doesn't consider?
+- Correctness: Are your claims accurate and well-supported?
+- Completeness: Have you addressed all important aspects of the prompt?
+- Actionability: Is your response practical and useful to the user?
+- Clarity: Is your response well-organized and easy to follow?
 
-Be specific and concrete. Reference specific parts of the plan. Do not just say "looks good" — find the problems.`;
+Be specific and substantive. Do not hedge or equivocate without reason. Provide concrete analysis, not generic advice.`;
 
 // --- Prompt Builders ---
 
-function buildDraftUserPrompt(plan: string, context?: string): string {
-  let prompt = `## Plan to Review\n\n${plan}`;
+function buildDraftUserPrompt(prompt: string, context?: string): string {
+  let text = prompt;
   if (context) {
-    prompt += `\n\n## Additional Context\n\n${context}`;
+    text += `\n\n## Additional Context\n\n${context}`;
   }
-  return prompt;
+  return text;
 }

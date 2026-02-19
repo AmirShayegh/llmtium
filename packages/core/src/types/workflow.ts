@@ -7,7 +7,7 @@ import type {
 } from "./pipeline.js";
 import type { SynthesisResponse } from "./synthesis-response.js";
 
-export type WorkflowType = "review_plan";
+export type WorkflowType = "review_plan" | "general";
 
 export interface WorkflowInput {
   prompt: string;

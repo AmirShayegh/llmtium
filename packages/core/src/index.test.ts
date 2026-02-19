@@ -8,6 +8,7 @@ import {
   deanonymize,
   runPipeline,
   reviewPlan,
+  general,
   CROSS_REVIEW_SCHEMA,
   SYNTHESIS_RESPONSE_SCHEMA,
 } from "./index.js";
@@ -26,6 +27,7 @@ import type {
   WorkflowInput,
   WorkflowResult,
   ReviewPlanInput,
+  GeneralInput,
 } from "./index.js";
 
 describe("@llmtium/core", () => {
@@ -165,12 +167,13 @@ describe("@llmtium/core", () => {
   });
 
   describe("Workflow exports", () => {
-    it("should export reviewPlan, workflow types, and schemas", () => {
+    it("should export reviewPlan, general, workflow types, and schemas", () => {
       expect(typeof reviewPlan).toBe("function");
+      expect(typeof general).toBe("function");
 
       // Type-level checks: workflow types compile
-      const workflowType: WorkflowType = "review_plan";
-      expect(workflowType).toBe("review_plan");
+      const workflowType: WorkflowType = "general";
+      expect(workflowType).toBe("general");
 
       const input: WorkflowInput = {
         prompt: "test",

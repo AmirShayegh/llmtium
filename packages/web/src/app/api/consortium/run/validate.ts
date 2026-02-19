@@ -1,4 +1,5 @@
 const VALID_PROVIDERS = new Set(["anthropic", "openai", "google"]);
+const VALID_WORKFLOWS = new Set(["general", "review_plan"]);
 
 export function validateRunRequest(body: unknown): string | null {
   if (!body || typeof body !== "object") return "Request body must be an object";
@@ -11,6 +12,12 @@ export function validateRunRequest(body: unknown): string | null {
 
   if (req.context !== undefined && typeof req.context !== "string") {
     return "context must be a string if provided";
+  }
+
+  if (req.workflow !== undefined) {
+    if (typeof req.workflow !== "string" || !VALID_WORKFLOWS.has(req.workflow)) {
+      return "workflow must be 'general' or 'review_plan'";
+    }
   }
 
   if (!Array.isArray(req.models) || req.models.length < 2) {

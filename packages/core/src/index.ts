@@ -53,3 +53,6 @@ export { SYNTHESIS_RESPONSE_SCHEMA } from "./schemas/synthesis-response.schema.j
 
 export { reviewPlan } from "./workflows/review-plan.js";
 export type { ReviewPlanInput } from "./workflows/review-plan.js";
+
+export { general } from "./workflows/general.js";
+export type { GeneralInput } from "./workflows/general.js";

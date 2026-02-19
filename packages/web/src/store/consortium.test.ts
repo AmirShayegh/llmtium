@@ -38,9 +38,10 @@ describe("consortium store", () => {
     store = createConsortiumStore();
   });
 
-  it("should initialize with idle status and empty state", () => {
+  it("should initialize with idle status, general workflow, and empty state", () => {
     const state = store.getState();
     expect(state.runStatus).toBe("idle");
+    expect(state.workflow).toBe("general");
     expect(state.models).toEqual([]);
     expect(state.drafts).toEqual({});
     expect(state.reviews).toEqual({});
@@ -52,6 +53,14 @@ describe("consortium store", () => {
     expect(state.stages.draft.status).toBe("pending");
     expect(state.stages.review.status).toBe("pending");
     expect(state.stages.synthesis.status).toBe("pending");
+  });
+
+  it("should update workflow via setWorkflow", () => {
+    expect(store.getState().workflow).toBe("general");
+    store.getState().setWorkflow("review_plan");
+    expect(store.getState().workflow).toBe("review_plan");
+    store.getState().setWorkflow("general");
+    expect(store.getState().workflow).toBe("general");
   });
 
   describe("handleEvent: draft stage", () => {
@@ -466,7 +475,7 @@ describe("consortium store", () => {
       });
 
       // Start run but check state before stream events arrive
-      const runPromise = s.getState().startRun("test", ["anthropic", "openai"], "anthropic");
+      const runPromise = s.getState().startRun("test", ["anthropic", "openai"], "anthropic", "general");
 
       // Before any events, all stages should show per-model pending indicators
       const state = s.getState();
@@ -502,7 +511,7 @@ describe("consortium store", () => {
         getKeys: async () => ({ anthropic: "sk-ant", openai: "sk-oai" }),
       });
 
-      await s.getState().startRun("test prompt", ["anthropic", "openai"], "anthropic");
+      await s.getState().startRun("test prompt", ["anthropic", "openai"], "anthropic", "general");
 
       expect(mockFetcher).toHaveBeenCalledWith(
         "/api/consortium/run",
@@ -512,6 +521,7 @@ describe("consortium store", () => {
             prompt: "test prompt",
             models: ["anthropic", "openai"],
             synthesizer: "anthropic",
+            workflow: "general",
             apiKeys: { anthropic: "sk-ant", openai: "sk-oai" },
           }),
         }),
@@ -537,7 +547,7 @@ describe("consortium store", () => {
         getKeys: async () => ({ anthropic: "sk-ant" }),
       });
 
-      await s.getState().startRun("test", ["anthropic"], "anthropic");
+      await s.getState().startRun("test", ["anthropic"], "anthropic", "general");
 
       expect(s.getState().runStatus).toBe("error");
       expect(s.getState().errorMessage).toBe("Stream ended unexpectedly");
@@ -727,13 +737,13 @@ describe("consortium store", () => {
       });
 
       // Start run A
-      const runAPromise = store2.getState().startRun("prompt A", ["anthropic"], "anthropic");
+      const runAPromise = store2.getState().startRun("prompt A", ["anthropic"], "anthropic", "general");
 
       // Give run A a tick to start
       await new Promise((r) => setTimeout(r, 10));
 
       // Start run B (should abort run A)
-      await store2.getState().startRun("prompt B", ["anthropic"], "anthropic");
+      await store2.getState().startRun("prompt B", ["anthropic"], "anthropic", "general");
 
       // Let stream A close
       resolveStreamA?.();

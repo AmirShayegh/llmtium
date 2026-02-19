@@ -1,5 +1,5 @@
 import { createStore } from "zustand/vanilla";
-import type { CrossReview, SynthesisResponse, PipelineError } from "@llmtium/core";
+import type { CrossReview, SynthesisResponse, PipelineError, WorkflowType } from "@llmtium/core";
 import type { SerializedWorkflowResult } from "@/lib/serialize";
 import { parseSSE } from "@/lib/sse";
 
@@ -17,6 +17,7 @@ export interface StageState {
 export interface ConsortiumState {
   runStatus: RunStatus;
   runId: number;
+  workflow: WorkflowType;
   prompt: string;
   models: string[];
   synthesizer: string;
@@ -39,8 +40,9 @@ export interface ConsortiumState {
 
   startedAt: number | null;
 
+  setWorkflow: (workflow: WorkflowType) => void;
   handleEvent: (event: Record<string, unknown>) => void;
-  startRun: (prompt: string, models: string[], synthesizer: string) => Promise<void>;
+  startRun: (prompt: string, models: string[], synthesizer: string, workflow: WorkflowType) => Promise<void>;
   reset: () => void;
 }
 
@@ -70,6 +72,7 @@ function makeInitialState() {
   return {
     runStatus: "idle" as RunStatus,
     runId: 0,
+    workflow: "general" as WorkflowType,
     prompt: "",
     models: [] as string[],
     synthesizer: "",
@@ -262,7 +265,11 @@ export function createConsortiumStore(options?: ConsortiumStoreOptions) {
       // Unknown stages are silently ignored
     },
 
-    startRun: async (prompt: string, models: string[], synthesizer: string) => {
+    setWorkflow: (workflow: WorkflowType) => {
+      set({ workflow });
+    },
+
+    startRun: async (prompt: string, models: string[], synthesizer: string, workflow: WorkflowType) => {
       // Abort prior run
       if (_abortController) {
         _abortController.abort();
@@ -282,6 +289,7 @@ export function createConsortiumStore(options?: ConsortiumStoreOptions) {
         ...initial,
         runStatus: "running",
         runId,
+        workflow,
         prompt,
         models,
         synthesizer,
@@ -300,7 +308,7 @@ export function createConsortiumStore(options?: ConsortiumStoreOptions) {
 
         const stream = parseSSE({
           url: "/api/consortium/run",
-          body: { prompt, models, synthesizer, apiKeys },
+          body: { prompt, models, synthesizer, workflow, apiKeys },
           signal: _abortController.signal,
           fetcher,
         });

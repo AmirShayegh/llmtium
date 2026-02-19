@@ -93,4 +93,24 @@ describe("validateRunRequest", () => {
     const req = { ...validRequest(), apiKeys: { anthropic: "sk-123", openai: "   " } };
     expect(validateRunRequest(req)).toContain("apiKey");
   });
+
+  it("should return null when workflow is 'general'", () => {
+    const req = { ...validRequest(), workflow: "general" };
+    expect(validateRunRequest(req)).toBeNull();
+  });
+
+  it("should return null when workflow is 'review_plan'", () => {
+    const req = { ...validRequest(), workflow: "review_plan" };
+    expect(validateRunRequest(req)).toBeNull();
+  });
+
+  it("should return error for unknown workflow value", () => {
+    const req = { ...validRequest(), workflow: "bogus" };
+    expect(validateRunRequest(req)).toContain("workflow");
+  });
+
+  it("should return error for non-string workflow", () => {
+    const req = { ...validRequest(), workflow: 42 };
+    expect(validateRunRequest(req)).toContain("workflow");
+  });
 });

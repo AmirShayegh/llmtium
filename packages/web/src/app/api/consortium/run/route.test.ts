@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { ReviewPlanInput, WorkflowResult } from "@llmtium/core";
+import type { ReviewPlanInput, GeneralInput, WorkflowResult } from "@llmtium/core";
 
 vi.mock("@llmtium/core", () => ({
   anthropicProvider: {
@@ -21,12 +21,14 @@ vi.mock("@llmtium/core", () => ({
     validateKey: vi.fn(),
   },
   reviewPlan: vi.fn(),
+  general: vi.fn(),
 }));
 
-import { reviewPlan } from "@llmtium/core";
+import { reviewPlan, general } from "@llmtium/core";
 import { POST } from "./route.js";
 
 const mockReviewPlan = reviewPlan as ReturnType<typeof vi.fn>;
+const mockGeneral = general as ReturnType<typeof vi.fn>;
 
 function makeRequest(body: unknown): Request {
   return new Request("http://localhost/api/consortium/run", {
@@ -201,5 +203,45 @@ describe("POST /api/consortium/run", () => {
     expect(lastEvent.stage).toBe("done");
     expect(lastEvent.status).toBe("error");
     expect(lastEvent.error).toContain("Pipeline exploded");
+  });
+
+  describe("workflow dispatch", () => {
+    it("should default to review_plan when workflow is not specified", async () => {
+      mockReviewPlan.mockResolvedValue(mockWorkflowResult());
+      const response = await POST(makeRequest(validBody()));
+      await response.text();
+
+      expect(mockReviewPlan).toHaveBeenCalledTimes(1);
+      expect(mockGeneral).not.toHaveBeenCalled();
+    });
+
+    it("should dispatch to review_plan when workflow is 'review_plan'", async () => {
+      mockReviewPlan.mockResolvedValue(mockWorkflowResult());
+      const body = { ...validBody(), workflow: "review_plan" };
+      const response = await POST(makeRequest(body));
+      await response.text();
+
+      expect(mockReviewPlan).toHaveBeenCalledTimes(1);
+      expect(mockGeneral).not.toHaveBeenCalled();
+    });
+
+    it("should dispatch to general when workflow is 'general'", async () => {
+      mockGeneral.mockResolvedValue(mockWorkflowResult());
+      const body = { ...validBody(), workflow: "general" };
+      const response = await POST(makeRequest(body));
+      await response.text();
+
+      expect(mockGeneral).toHaveBeenCalledTimes(1);
+      expect(mockReviewPlan).not.toHaveBeenCalled();
+    });
+
+    it("should return 400 for unknown workflow value", async () => {
+      const body = { ...validBody(), workflow: "bogus" };
+      const response = await POST(makeRequest(body));
+
+      expect(response.status).toBe(400);
+      const json = await response.json();
+      expect(json.error).toContain("workflow");
+    });
   });
 });

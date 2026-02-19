@@ -9,6 +9,7 @@ import { initCrypto } from "@/lib/crypto";
 import { getKeysStore } from "@/store/keys";
 import { PROVIDER_META } from "@/lib/provider-meta";
 import type { ConsortiumState } from "@/store/consortium";
+import type { WorkflowType } from "@llmtium/core";
 import type { StoreApi } from "zustand";
 
 const keysStore = getKeysStore();
@@ -20,6 +21,11 @@ function selectConfiguredKeys(s: { providers: Record<string, { encryptedKey: str
     .join(",");
 }
 
+const WORKFLOW_OPTIONS: { value: WorkflowType; label: string; placeholder: string }[] = [
+  { value: "general", label: "General", placeholder: "Enter your prompt for deliberation..." },
+  { value: "review_plan", label: "Plan Review", placeholder: "Enter your plan for review..." },
+];
+
 interface ConsortiumInputProps {
   store: StoreApi<ConsortiumState>;
 }
@@ -30,6 +36,8 @@ export function ConsortiumInput({ store }: ConsortiumInputProps) {
 
   const runStatus = useStore(store, (s) => s.runStatus);
   const startRun = useStore(store, (s) => s.startRun);
+  const workflow = useStore(store, (s) => s.workflow);
+  const setWorkflow = useStore(store, (s) => s.setWorkflow);
   const configuredKeysStr = useStore(keysStore, selectConfiguredKeys);
   const configuredIds = useMemo(
     () => (configuredKeysStr ? configuredKeysStr.split(",") : []),
@@ -48,8 +56,8 @@ export function ConsortiumInput({ store }: ConsortiumInputProps) {
     const synthesizer = configuredIds.includes("anthropic")
       ? "anthropic"
       : configuredIds[0]!;
-    startRun(prompt.trim(), configuredIds, synthesizer);
-  }, [prompt, hasValid, runStatus, configuredIds, startRun]);
+    startRun(prompt.trim(), configuredIds, synthesizer, workflow);
+  }, [prompt, hasValid, runStatus, configuredIds, startRun, workflow]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -65,11 +73,30 @@ export function ConsortiumInput({ store }: ConsortiumInputProps) {
 
   const isRunning = runStatus === "running";
   const canRun = prompt.trim().length > 0 && hasValid && !isRunning;
+  const currentOption = WORKFLOW_OPTIONS.find((o) => o.value === workflow) ?? WORKFLOW_OPTIONS[0]!;
 
   return (
     <div className={`space-y-4 ${isRunning ? "opacity-60" : ""}`}>
+      <div className="flex items-center gap-1">
+        {WORKFLOW_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={workflow === option.value}
+            onClick={() => setWorkflow(option.value)}
+            disabled={isRunning}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              workflow === option.value
+                ? "bg-foreground text-background"
+                : "bg-muted text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
       <Textarea
-        placeholder="Enter your plan or prompt for deliberation..."
+        placeholder={currentOption.placeholder}
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
         onKeyDown={handleKeyDown}
