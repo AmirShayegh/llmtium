@@ -36,3 +36,6 @@ coverage/
 docs/
 CLAUDE-RULES.md
 CLAUDE.md
+
+# Claude Code
+.claude/
