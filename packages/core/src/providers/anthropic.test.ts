@@ -261,6 +261,135 @@ describe("anthropicProvider", () => {
     });
   });
 
+  describe("thinking support", () => {
+    it("should pass thinking: adaptive and max_tokens: 16384 for default model in draft", async () => {
+      mockStream.mockReturnValue(makeStreamResult("ok", 5, 2));
+
+      await provider.anthropicProvider.draft(config, { userPrompt: "test" });
+
+      expect(mockStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          thinking: { type: "adaptive" },
+          max_tokens: 16384,
+        }),
+      );
+    });
+
+    it("should not pass thinking for non-thinking model in draft", async () => {
+      mockStream.mockReturnValue(makeStreamResult("ok", 5, 2));
+
+      await provider.anthropicProvider.draft(
+        { apiKey: "key", model: "claude-3-5-sonnet-20241022" },
+        { userPrompt: "test" },
+      );
+
+      const callArgs = mockStream.mock.calls[0]![0] as Record<string, unknown>;
+      expect(callArgs).not.toHaveProperty("thinking");
+      expect(callArgs.max_tokens).toBe(8192);
+    });
+
+    it("should use tool_choice auto with thinking for default model in structuredOutput", async () => {
+      mockCreate.mockResolvedValue(makeToolUseResponse({ score: 4 }));
+
+      await provider.anthropicProvider.structuredOutput(config, structuredReq);
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tool_choice: { type: "auto" },
+          thinking: { type: "adaptive" },
+          max_tokens: 16384,
+        }),
+      );
+    });
+
+    it("should fall back to forced tool_choice after no tool_use block with thinking", async () => {
+      // First attempt: thinking + auto → no tool_use block
+      mockCreate
+        .mockResolvedValueOnce({ content: [{ type: "text", text: "analysis" }] })
+        // Second attempt: forced tool → succeeds
+        .mockResolvedValueOnce(makeToolUseResponse({ score: 3 }));
+
+      const result = await provider.anthropicProvider.structuredOutput<{ score: number }>(
+        config,
+        structuredReq,
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.score).toBe(3);
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+      // First call: auto + thinking
+      expect(mockCreate.mock.calls[0]![0]).toEqual(
+        expect.objectContaining({ tool_choice: { type: "auto" } }),
+      );
+      // Second call: forced tool, no thinking
+      expect(mockCreate.mock.calls[1]![0]).toEqual(
+        expect.objectContaining({
+          tool_choice: { type: "tool", name: "submit_review" },
+          max_tokens: 8192,
+        }),
+      );
+      const secondCallArgs = mockCreate.mock.calls[1]![0] as Record<string, unknown>;
+      expect(secondCallArgs).not.toHaveProperty("thinking");
+    });
+
+    it("should fail after 3 attempts with persistent no tool_use (known degradation)", async () => {
+      // 1st: thinking + auto → no tool block, 2nd & 3rd: forced tool → still no tool block
+      mockCreate
+        .mockResolvedValueOnce({ content: [{ type: "text", text: "text only" }] })
+        .mockResolvedValueOnce({ content: [{ type: "text", text: "still text" }] })
+        .mockResolvedValueOnce({ content: [{ type: "text", text: "final text" }] });
+
+      const result = await provider.anthropicProvider.structuredOutput(config, structuredReq);
+
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error).toContain("Structured output failed after 3 attempts");
+      expect(mockCreate).toHaveBeenCalledTimes(3);
+      // First call had thinking, remaining did not
+      expect(mockCreate.mock.calls[0]![0]).toEqual(
+        expect.objectContaining({ tool_choice: { type: "auto" } }),
+      );
+      expect(mockCreate.mock.calls[1]![0]).toEqual(
+        expect.objectContaining({ tool_choice: { type: "tool", name: "submit_review" } }),
+      );
+      expect(mockCreate.mock.calls[2]![0]).toEqual(
+        expect.objectContaining({ tool_choice: { type: "tool", name: "submit_review" } }),
+      );
+    });
+
+    it("should fall back to non-thinking draft on thinking rejection (400)", async () => {
+      const thinkingError = Object.assign(
+        new Error("thinking parameter not supported for this model"),
+        { status: 400 },
+      );
+      mockStream
+        .mockImplementationOnce(() => { throw thinkingError; })
+        .mockReturnValueOnce(makeStreamResult("fallback ok", 5, 2));
+
+      const result = await provider.anthropicProvider.draft(config, { userPrompt: "test" });
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.content).toBe("fallback ok");
+      expect(mockStream).toHaveBeenCalledTimes(2);
+      // Second call: no thinking, standard max_tokens
+      const secondCallArgs = mockStream.mock.calls[1]![0] as Record<string, unknown>;
+      expect(secondCallArgs).not.toHaveProperty("thinking");
+      expect(secondCallArgs.max_tokens).toBe(8192);
+    });
+
+    it("should fail immediately on non-thinking 400 for non-thinking model", async () => {
+      mockCreate.mockRejectedValueOnce(new MockAPIError(400, "Bad request"));
+
+      const result = await provider.anthropicProvider.structuredOutput(
+        { apiKey: "key", model: "claude-3-5-sonnet-20241022" },
+        structuredReq,
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error).toContain("API error (400)");
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("validateKey", () => {
     it("should return success true for valid key", async () => {
       mockCreate.mockResolvedValue({

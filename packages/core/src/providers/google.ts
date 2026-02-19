@@ -9,6 +9,12 @@ import type {
 } from "./types.js";
 import { withStructuredRetry } from "./structured-retry.js";
 import { withTransientRetry } from "./transient-retry.js";
+import {
+  getGoogleThinkingConfig,
+  isThinkingRejection,
+  withThinkingFallback,
+  GOOGLE_THINKING_PATTERN,
+} from "./thinking.js";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
 
@@ -47,6 +53,44 @@ function formatError(error: unknown): string {
   return msg;
 }
 
+async function streamDraftImpl(
+  ai: GoogleGenAI,
+  modelName: string,
+  request: DraftRequest,
+  start: number,
+  thinkingConfig?: { thinkingBudget: number },
+): Promise<DraftResponse> {
+  const response = await ai.models.generateContentStream({
+    model: modelName,
+    contents: request.userPrompt,
+    config: {
+      ...(request.systemPrompt
+        ? { systemInstruction: request.systemPrompt }
+        : {}),
+      ...(thinkingConfig ? { thinkingConfig } : {}),
+    },
+  });
+
+  let content = "";
+  let tokensIn = 0;
+  let tokensOut = 0;
+  for await (const chunk of response) {
+    content += chunk.text ?? "";
+    if (chunk.usageMetadata) {
+      tokensIn = chunk.usageMetadata.promptTokenCount ?? 0;
+      tokensOut = chunk.usageMetadata.candidatesTokenCount ?? 0;
+    }
+  }
+
+  return {
+    content,
+    model: modelName,
+    tokensIn,
+    tokensOut,
+    durationMs: Date.now() - start,
+  };
+}
+
 async function draft(
   config: ProviderConfig,
   request: DraftRequest,
@@ -56,36 +100,25 @@ async function draft(
     const ai = new GoogleGenAI({ apiKey: config.apiKey });
     const modelName = config.model ?? DEFAULT_MODEL;
 
-    const data = await withTransientRetry(async () => {
-      const response = await ai.models.generateContentStream({
-        model: modelName,
-        contents: request.userPrompt,
-        config: {
-          ...(request.systemPrompt
-            ? { systemInstruction: request.systemPrompt }
-            : {}),
-        },
-      });
+    // Gemini 2.5 models think by default regardless of whether thinkingConfig
+    // is passed. This configures the budget (auto/dynamic via -1), not whether
+    // thinking happens.
+    const thinkingConfig = getGoogleThinkingConfig(modelName);
 
-      let content = "";
-      let tokensIn = 0;
-      let tokensOut = 0;
-      for await (const chunk of response) {
-        content += chunk.text ?? "";
-        if (chunk.usageMetadata) {
-          tokensIn = chunk.usageMetadata.promptTokenCount ?? 0;
-          tokensOut = chunk.usageMetadata.candidatesTokenCount ?? 0;
-        }
-      }
-
-      return {
-        content,
-        model: modelName,
-        tokensIn,
-        tokensOut,
-        durationMs: Date.now() - start,
-      };
-    });
+    // Thinking fallback wraps outside transient retry so each branch
+    // gets its own transient retry protection.
+    const data = await withThinkingFallback(
+      thinkingConfig != null,
+      GOOGLE_THINKING_PATTERN,
+      () =>
+        withTransientRetry(() =>
+          streamDraftImpl(ai, modelName, request, start, thinkingConfig ?? undefined),
+        ),
+      () =>
+        withTransientRetry(() =>
+          streamDraftImpl(ai, modelName, request, start),
+        ),
+    );
 
     return { success: true, data };
   } catch (error) {
@@ -99,14 +132,16 @@ async function structuredOutput<T>(
 ): Promise<ProviderResult<T>> {
   const ai = new GoogleGenAI({ apiKey: config.apiKey });
   const modelName = config.model ?? DEFAULT_MODEL;
+  const thinkingConfig = getGoogleThinkingConfig(modelName);
+  let useThinking = thinkingConfig != null;
 
   return withStructuredRetry<T>(async (retryPrompt) => {
     const userContent = retryPrompt
       ? `${request.userPrompt}\n\n${retryPrompt}`
       : request.userPrompt;
 
-    // Transient retry (429/5xx/connection) nests inside structured retry (JSON parse).
-    // Worst case: 3 structured × 3 transient = 9 API calls.
+    // Mutable useThinking flag persists across structured retries so a
+    // thinking rejection on attempt 1 doesn't re-trigger on attempts 2–3.
     let result;
     try {
       result = await withTransientRetry(() =>
@@ -117,11 +152,29 @@ async function structuredOutput<T>(
             systemInstruction: request.systemPrompt,
             responseMimeType: "application/json",
             responseJsonSchema: request.schema,
+            ...(useThinking && thinkingConfig
+              ? { thinkingConfig }
+              : {}),
           },
         }),
       );
     } catch (error) {
-      throw new Error(formatError(error));
+      if (useThinking && isThinkingRejection(error, GOOGLE_THINKING_PATTERN)) {
+        useThinking = false;
+        result = await withTransientRetry(() =>
+          ai.models.generateContent({
+            model: modelName,
+            contents: userContent,
+            config: {
+              systemInstruction: request.systemPrompt,
+              responseMimeType: "application/json",
+              responseJsonSchema: request.schema,
+            },
+          }),
+        );
+      } else {
+        throw new Error(formatError(error));
+      }
     }
 
     // Empty text is a malformed response — return empty to trigger retry

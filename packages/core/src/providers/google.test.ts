@@ -397,6 +397,130 @@ describe("googleProvider", () => {
     });
   });
 
+  describe("thinking support", () => {
+    it("should pass thinkingConfig for default model gemini-2.5-flash in draft", async () => {
+      mockGenerateContentStream.mockResolvedValue(
+        makeStreamChunks(["ok"], { promptTokenCount: 5, candidatesTokenCount: 2 }),
+      );
+
+      await provider.googleProvider.draft(config, { userPrompt: "test" });
+
+      expect(mockGenerateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            thinkingConfig: { thinkingBudget: -1 },
+          }),
+        }),
+      );
+    });
+
+    it("should NOT pass thinkingConfig for gemini-2.0-flash in draft", async () => {
+      mockGenerateContentStream.mockResolvedValue(
+        makeStreamChunks(["ok"], { promptTokenCount: 5, candidatesTokenCount: 2 }),
+      );
+
+      await provider.googleProvider.draft(
+        { apiKey: "key", model: "gemini-2.0-flash" },
+        { userPrompt: "test" },
+      );
+
+      const callArgs = mockGenerateContentStream.mock.calls[0]![0] as Record<string, unknown>;
+      const configArg = callArgs.config as Record<string, unknown>;
+      expect(configArg).not.toHaveProperty("thinkingConfig");
+    });
+
+    it("should pass thinkingConfig for default model in structuredOutput", async () => {
+      mockGenerateContent.mockResolvedValue(makeContentResult('{"score":4}'));
+
+      await provider.googleProvider.structuredOutput(config, structuredReq);
+
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            thinkingConfig: { thinkingBudget: -1 },
+          }),
+        }),
+      );
+    });
+
+    it("should fall back to no thinkingConfig on thinking rejection (400)", async () => {
+      const thinkingError = Object.assign(
+        new Error("unsupported thinkingConfig for this model"),
+        { status: 400 },
+      );
+      mockGenerateContentStream
+        .mockRejectedValueOnce(thinkingError)
+        .mockResolvedValueOnce(
+          makeStreamChunks(["fallback"], { promptTokenCount: 5, candidatesTokenCount: 2 }),
+        );
+
+      const result = await provider.googleProvider.draft(config, { userPrompt: "test" });
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.content).toBe("fallback");
+      expect(mockGenerateContentStream).toHaveBeenCalledTimes(2);
+      // Second call: no thinkingConfig
+      const secondCallArgs = mockGenerateContentStream.mock.calls[1]![0] as Record<string, unknown>;
+      const configArg = secondCallArgs.config as Record<string, unknown>;
+      expect(configArg).not.toHaveProperty("thinkingConfig");
+    });
+
+    it("should not re-trigger thinking rejection on structuredOutput retries", async () => {
+      const thinkingError = Object.assign(
+        new Error("unsupported thinkingConfig for this model"),
+        { status: 400 },
+      );
+      // Attempt 1: thinking rejected → fallback without thinking → bad JSON
+      // Attempt 2: no thinking (mutable flag off) → valid JSON
+      mockGenerateContent
+        .mockRejectedValueOnce(thinkingError)
+        .mockResolvedValueOnce(makeContentResult("bad json"))
+        .mockResolvedValueOnce(makeContentResult('{"score":5}'));
+
+      const result = await provider.googleProvider.structuredOutput<{ score: number }>(
+        config,
+        structuredReq,
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.score).toBe(5);
+      expect(mockGenerateContent).toHaveBeenCalledTimes(3);
+      // Call 1: with thinkingConfig (rejected)
+      const firstCallConfig = (mockGenerateContent.mock.calls[0]![0] as Record<string, unknown>)
+        .config as Record<string, unknown>;
+      expect(firstCallConfig).toHaveProperty("thinkingConfig");
+      // Call 2: fallback without thinkingConfig
+      const secondCallConfig = (mockGenerateContent.mock.calls[1]![0] as Record<string, unknown>)
+        .config as Record<string, unknown>;
+      expect(secondCallConfig).not.toHaveProperty("thinkingConfig");
+      // Call 3: retry still without thinkingConfig (mutable flag persists)
+      const thirdCallConfig = (mockGenerateContent.mock.calls[2]![0] as Record<string, unknown>)
+        .config as Record<string, unknown>;
+      expect(thirdCallConfig).not.toHaveProperty("thinkingConfig");
+    });
+
+    it("should compose fallback → transient retry correctly", async () => {
+      const thinkingError = Object.assign(
+        new Error("unsupported thinkingConfig"),
+        { status: 400 },
+      );
+      const error503 = Object.assign(new Error("Service unavailable"), { status: 503 });
+
+      mockGenerateContentStream
+        .mockRejectedValueOnce(thinkingError)   // thinking → 400 → fallback
+        .mockRejectedValueOnce(error503)         // fallback → 503 → transient retry
+        .mockResolvedValueOnce(                  // retry → success
+          makeStreamChunks(["recovered"], { promptTokenCount: 5, candidatesTokenCount: 2 }),
+        );
+
+      const result = await provider.googleProvider.draft(config, { userPrompt: "test" });
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.content).toBe("recovered");
+      expect(mockGenerateContentStream).toHaveBeenCalledTimes(3);
+    });
+  });
+
   describe("validateKey", () => {
     it("should return success true for valid key", async () => {
       mockGenerateContent.mockResolvedValue(makeContentResult("hi"));

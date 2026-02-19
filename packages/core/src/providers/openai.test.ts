@@ -276,6 +276,195 @@ describe("openaiProvider", () => {
     });
   });
 
+  describe("thinking support", () => {
+    it("should pass reasoning_effort for o4-mini and stream normally", async () => {
+      mockCreate.mockResolvedValue(
+        makeStreamChunks(["reasoned"], { prompt_tokens: 10, completion_tokens: 5 }),
+      );
+
+      const result = await provider.openaiProvider.draft(
+        { apiKey: "key", model: "o4-mini" },
+        { userPrompt: "test" },
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.content).toBe("reasoned");
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reasoning_effort: "medium",
+          stream: true,
+        }),
+      );
+    });
+
+    it("should NOT pass reasoning_effort for default model gpt-5.2", async () => {
+      mockCreate.mockResolvedValue(
+        makeStreamChunks(["ok"], { prompt_tokens: 5, completion_tokens: 2 }),
+      );
+
+      await provider.openaiProvider.draft(config, { userPrompt: "test" });
+
+      const callArgs = mockCreate.mock.calls[0]![0] as Record<string, unknown>;
+      expect(callArgs).not.toHaveProperty("reasoning_effort");
+      expect(callArgs.stream).toBe(true);
+    });
+
+    it("should use non-streaming for o3 with reasoning_effort", async () => {
+      mockCreate.mockResolvedValue({
+        choices: [{ message: { content: "o3 result" } }],
+        usage: { prompt_tokens: 12, completion_tokens: 8 },
+      });
+
+      const result = await provider.openaiProvider.draft(
+        { apiKey: "key", model: "o3" },
+        { userPrompt: "test" },
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.content).toBe("o3 result");
+        expect(result.data.tokensIn).toBe(12);
+        expect(result.data.tokensOut).toBe(8);
+      }
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reasoning_effort: "medium",
+          model: "o3",
+        }),
+      );
+      const callArgs = mockCreate.mock.calls[0]![0] as Record<string, unknown>;
+      expect(callArgs).not.toHaveProperty("stream");
+    });
+
+    it("should pass reasoning_effort for o4-mini in structuredOutput", async () => {
+      mockCreate.mockResolvedValue(makeJsonResponse({ score: 4 }));
+
+      await provider.openaiProvider.structuredOutput(
+        { apiKey: "key", model: "o4-mini" },
+        structuredReq,
+      );
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ reasoning_effort: "medium" }),
+      );
+    });
+
+    it("should NOT pass reasoning_effort for gpt-5.2 in structuredOutput", async () => {
+      mockCreate.mockResolvedValue(makeJsonResponse({ score: 4 }));
+
+      await provider.openaiProvider.structuredOutput(config, structuredReq);
+
+      const callArgs = mockCreate.mock.calls[0]![0] as Record<string, unknown>;
+      expect(callArgs).not.toHaveProperty("reasoning_effort");
+    });
+
+    it("should fall back to streaming without reasoning on o4-mini rejection", async () => {
+      const reasoningError = Object.assign(
+        new Error("invalid reasoning_effort for this model"),
+        { status: 400 },
+      );
+      mockCreate
+        .mockRejectedValueOnce(reasoningError)
+        .mockResolvedValueOnce(
+          makeStreamChunks(["fallback"], { prompt_tokens: 5, completion_tokens: 2 }),
+        );
+
+      const result = await provider.openaiProvider.draft(
+        { apiKey: "key", model: "o4-mini" },
+        { userPrompt: "test" },
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.content).toBe("fallback");
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+      // Second call: streaming without reasoning_effort
+      const secondCallArgs = mockCreate.mock.calls[1]![0] as Record<string, unknown>;
+      expect(secondCallArgs).not.toHaveProperty("reasoning_effort");
+      expect(secondCallArgs.stream).toBe(true);
+    });
+
+    it("should fall back to non-streaming without reasoning for o3 rejection", async () => {
+      const reasoningError = Object.assign(
+        new Error("invalid reasoning_effort for this model"),
+        { status: 400 },
+      );
+      mockCreate
+        .mockRejectedValueOnce(reasoningError)
+        .mockResolvedValueOnce({
+          choices: [{ message: { content: "o3 fallback" } }],
+          usage: { prompt_tokens: 5, completion_tokens: 2 },
+        });
+
+      const result = await provider.openaiProvider.draft(
+        { apiKey: "key", model: "o3" },
+        { userPrompt: "test" },
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.content).toBe("o3 fallback");
+      // Fallback should also be non-streaming (o3 can't stream)
+      const secondCallArgs = mockCreate.mock.calls[1]![0] as Record<string, unknown>;
+      expect(secondCallArgs).not.toHaveProperty("reasoning_effort");
+      expect(secondCallArgs).not.toHaveProperty("stream");
+    });
+
+    it("should not re-trigger reasoning rejection on structuredOutput retries", async () => {
+      const reasoningError = Object.assign(
+        new Error("invalid reasoning_effort for this model"),
+        { status: 400 },
+      );
+      // Attempt 1: reasoning rejected → fallback without reasoning → bad JSON
+      // Attempt 2: no reasoning (mutable flag off) → valid JSON
+      mockCreate
+        .mockRejectedValueOnce(reasoningError)
+        .mockResolvedValueOnce({ choices: [{ message: { content: "bad json" } }] })
+        .mockResolvedValueOnce(makeJsonResponse({ score: 5 }));
+
+      const result = await provider.openaiProvider.structuredOutput<{ score: number }>(
+        { apiKey: "key", model: "o4-mini" },
+        structuredReq,
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.score).toBe(5);
+      expect(mockCreate).toHaveBeenCalledTimes(3);
+      // Call 1: with reasoning_effort (rejected)
+      expect(mockCreate.mock.calls[0]![0]).toEqual(
+        expect.objectContaining({ reasoning_effort: "medium" }),
+      );
+      // Call 2: fallback without reasoning_effort
+      const secondCallArgs = mockCreate.mock.calls[1]![0] as Record<string, unknown>;
+      expect(secondCallArgs).not.toHaveProperty("reasoning_effort");
+      // Call 3: retry still without reasoning_effort (mutable flag persists)
+      const thirdCallArgs = mockCreate.mock.calls[2]![0] as Record<string, unknown>;
+      expect(thirdCallArgs).not.toHaveProperty("reasoning_effort");
+    });
+
+    it("should compose fallback → transient retry correctly", async () => {
+      const reasoningError = Object.assign(
+        new Error("invalid reasoning_effort"),
+        { status: 400 },
+      );
+      const error503 = new MockAPIError(503, "Service unavailable");
+
+      mockCreate
+        .mockRejectedValueOnce(reasoningError)  // thinking → 400 → fallback
+        .mockRejectedValueOnce(error503)         // fallback → 503 → transient retry
+        .mockResolvedValueOnce(                  // retry → success
+          makeStreamChunks(["recovered"], { prompt_tokens: 5, completion_tokens: 2 }),
+        );
+
+      const result = await provider.openaiProvider.draft(
+        { apiKey: "key", model: "o4-mini" },
+        { userPrompt: "test" },
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.content).toBe("recovered");
+      expect(mockCreate).toHaveBeenCalledTimes(3);
+    });
+  });
+
   describe("validateKey", () => {
     it("should return success true for valid key", async () => {
       mockModelsList.mockResolvedValue({ data: [{ id: "gpt-5.2" }] });
