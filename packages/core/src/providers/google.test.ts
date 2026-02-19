@@ -6,6 +6,15 @@ import type { ProviderConfig, StructuredRequest } from "./types.js";
 const mockGenerateContentStream = vi.fn();
 const mockGenerateContent = vi.fn();
 
+vi.mock("./transient-retry.js", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("./transient-retry.js")>();
+  return {
+    ...mod,
+    withTransientRetry: <T>(fn: () => Promise<T>, maxRetries?: number, baseDelayMs?: number) =>
+      mod.withTransientRetry(fn, maxRetries, baseDelayMs, () => Promise.resolve()),
+  };
+});
+
 vi.mock("@google/genai", () => ({
   GoogleGenAI: vi.fn(() => ({
     models: {
@@ -139,6 +148,34 @@ describe("googleProvider", () => {
 
       expect(result.success).toBe(false);
       if (!result.success) expect(result.error).toBe("Connection failed");
+    });
+
+    // Persistent rejection exhausts retries, then formatError extracts the inner message
+    it("should extract human-readable message from nested JSON error", async () => {
+      const nestedMsg = JSON.stringify({
+        error: {
+          message: JSON.stringify({
+            error: {
+              code: 503,
+              message: "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.",
+              status: "UNAVAILABLE",
+            },
+          }),
+          code: 503,
+          status: "Service Unavailable",
+        },
+      });
+      const apiError = Object.assign(new Error(nestedMsg), { status: 503 });
+      mockGenerateContentStream.mockRejectedValue(apiError);
+
+      const result = await provider.googleProvider.draft(config, { userPrompt: "test" });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe(
+          "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.",
+        );
+      }
     });
 
     it("should return Connection failed for error with status undefined and ECONNREFUSED", async () => {
@@ -291,15 +328,72 @@ describe("googleProvider", () => {
       if (!result.success) expect(result.error).toContain("Structured output failed after 3 attempts");
     });
 
-    it("should fail immediately on API error without retrying", async () => {
-      const apiError = Object.assign(new Error("Rate limited"), { status: 429 });
+    it("should fail immediately on non-transient API error without retrying", async () => {
+      const apiError = Object.assign(new Error("Bad request"), { status: 400 });
       mockGenerateContent.mockRejectedValueOnce(apiError);
 
       const result = await provider.googleProvider.structuredOutput(config, structuredReq);
 
       expect(result.success).toBe(false);
-      if (!result.success) expect(result.error).toBe("Rate limit exceeded");
+      if (!result.success) expect(result.error).toContain("API error (400)");
       expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    });
+
+    it("should retry on 503 transient error and succeed", async () => {
+      const error503 = Object.assign(new Error("Service unavailable"), { status: 503 });
+      mockGenerateContent
+        .mockRejectedValueOnce(error503)
+        .mockResolvedValueOnce(makeContentResult('{"score":4}'));
+
+      const result = await provider.googleProvider.structuredOutput<{ score: number }>(
+        config,
+        structuredReq,
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.score).toBe(4);
+      expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("transient retry", () => {
+    it("should retry on 503 in draft and succeed", async () => {
+      const error503 = Object.assign(new Error("Service unavailable"), { status: 503 });
+      mockGenerateContentStream
+        .mockRejectedValueOnce(error503)
+        .mockResolvedValueOnce(
+          makeStreamChunks(["recovered"], { promptTokenCount: 5, candidatesTokenCount: 3 }),
+        );
+
+      const result = await provider.googleProvider.draft(config, { userPrompt: "test" });
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.content).toBe("recovered");
+      expect(mockGenerateContentStream).toHaveBeenCalledTimes(2);
+    });
+
+    it("should exhaust retries on persistent 503 in draft", async () => {
+      const error503 = Object.assign(new Error("Service unavailable"), { status: 503 });
+      mockGenerateContentStream.mockRejectedValue(error503);
+
+      const result = await provider.googleProvider.draft(config, { userPrompt: "test" });
+
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error).toBe("API error (503): Service unavailable");
+      expect(mockGenerateContentStream).toHaveBeenCalledTimes(3); // 1 + 2 retries
+    });
+
+    it("should retry ECONNREFUSED in draft and succeed", async () => {
+      mockGenerateContentStream
+        .mockRejectedValueOnce(new Error("connect ECONNREFUSED 127.0.0.1:443"))
+        .mockResolvedValueOnce(
+          makeStreamChunks(["ok"], { promptTokenCount: 1, candidatesTokenCount: 1 }),
+        );
+
+      const result = await provider.googleProvider.draft(config, { userPrompt: "test" });
+
+      expect(result.success).toBe(true);
+      expect(mockGenerateContentStream).toHaveBeenCalledTimes(2);
     });
   });
 

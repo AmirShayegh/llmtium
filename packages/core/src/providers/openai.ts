@@ -8,6 +8,7 @@ import type {
   ProviderResult,
 } from "./types.js";
 import { withStructuredRetry } from "./structured-retry.js";
+import { withTransientRetry } from "./transient-retry.js";
 
 const DEFAULT_MODEL = "gpt-5.2";
 
@@ -20,8 +21,9 @@ function formatError(error: unknown): string {
     return "Invalid API key";
   if (error instanceof OpenAI.RateLimitError) return "Rate limit exceeded";
   if (error instanceof OpenAI.APIConnectionError) return "Connection failed";
-  if (error instanceof OpenAI.APIError)
+  if (error instanceof OpenAI.APIError) {
     return `API error (${error.status}): ${error.message}`;
+  }
   return error instanceof Error ? error.message : String(error);
 }
 
@@ -29,7 +31,6 @@ async function draft(
   config: ProviderConfig,
   request: DraftRequest,
 ): Promise<ProviderResult<DraftResponse>> {
-  const start = Date.now();
   try {
     const client = createClient(config.apiKey);
     const model = config.model ?? DEFAULT_MODEL;
@@ -39,30 +40,32 @@ async function draft(
     }
     messages.push({ role: "user", content: request.userPrompt });
 
-    const stream = await client.chat.completions.create({
-      model,
-      messages,
-      stream: true,
-      stream_options: { include_usage: true },
+    const data = await withTransientRetry(async () => {
+      const start = Date.now();
+      const stream = await client.chat.completions.create({
+        model,
+        messages,
+        stream: true,
+        stream_options: { include_usage: true },
+      });
+
+      let content = "";
+      let tokensIn = 0;
+      let tokensOut = 0;
+
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta?.content;
+        if (delta) content += delta;
+        if (chunk.usage) {
+          tokensIn = chunk.usage.prompt_tokens;
+          tokensOut = chunk.usage.completion_tokens;
+        }
+      }
+
+      return { content, model, tokensIn, tokensOut, durationMs: Date.now() - start };
     });
 
-    let content = "";
-    let tokensIn = 0;
-    let tokensOut = 0;
-
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content;
-      if (delta) content += delta;
-      if (chunk.usage) {
-        tokensIn = chunk.usage.prompt_tokens;
-        tokensOut = chunk.usage.completion_tokens;
-      }
-    }
-
-    return {
-      success: true,
-      data: { content, model, tokensIn, tokensOut, durationMs: Date.now() - start },
-    };
+    return { success: true, data };
   } catch (error) {
     return { success: false, error: formatError(error) };
   }
@@ -84,20 +87,24 @@ async function structuredOutput<T>(
       : request.userPrompt;
     messages.push({ role: "user", content: userContent });
 
+    // Transient retry (429/5xx/connection) nests inside structured retry (JSON parse).
+    // Worst case: 3 structured × 3 transient = 9 API calls.
     let response;
     try {
-      response = await client.chat.completions.create({
-        model,
-        messages,
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: request.toolName,
-            schema: request.schema,
-            strict: true,
+      response = await withTransientRetry(() =>
+        client.chat.completions.create({
+          model,
+          messages,
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: request.toolName,
+              schema: request.schema,
+              strict: true,
+            },
           },
-        },
-      });
+        }),
+      );
     } catch (error) {
       throw new Error(formatError(error));
     }

@@ -14,11 +14,21 @@ class MockRateLimitError extends MockAPIError {
   constructor() { super(429, "Rate limited"); }
 }
 class MockAPIConnectionError extends Error {
+  override name = "APIConnectionError";
   constructor() { super("Connection refused"); }
 }
 
 const mockCreate = vi.fn();
 const mockModelsList = vi.fn();
+
+vi.mock("./transient-retry.js", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("./transient-retry.js")>();
+  return {
+    ...mod,
+    withTransientRetry: <T>(fn: () => Promise<T>, maxRetries?: number, baseDelayMs?: number) =>
+      mod.withTransientRetry(fn, maxRetries, baseDelayMs, () => Promise.resolve()),
+  };
+});
 
 vi.mock("openai", () => {
   const OpenAI = vi.fn(() => ({
@@ -198,14 +208,71 @@ describe("openaiProvider", () => {
       if (!result.success) expect(result.error).toContain("Structured output failed after 3 attempts");
     });
 
-    it("should fail immediately on API error without retrying", async () => {
-      mockCreate.mockRejectedValueOnce(new MockRateLimitError());
+    it("should fail immediately on non-transient API error without retrying", async () => {
+      mockCreate.mockRejectedValueOnce(new MockAPIError(400, "Bad request"));
 
       const result = await provider.openaiProvider.structuredOutput(config, structuredReq);
 
       expect(result.success).toBe(false);
-      if (!result.success) expect(result.error).toBe("Rate limit exceeded");
+      if (!result.success) expect(result.error).toContain("API error (400)");
       expect(mockCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it("should retry on 503 transient error and succeed", async () => {
+      const error503 = new MockAPIError(503, "Service unavailable");
+      mockCreate
+        .mockRejectedValueOnce(error503)
+        .mockResolvedValueOnce(makeJsonResponse({ score: 4 }));
+
+      const result = await provider.openaiProvider.structuredOutput<{ score: number }>(
+        config,
+        structuredReq,
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.score).toBe(4);
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("transient retry", () => {
+    it("should retry on 503 in draft and succeed", async () => {
+      const error503 = new MockAPIError(503, "Service unavailable");
+      mockCreate
+        .mockRejectedValueOnce(error503)
+        .mockResolvedValueOnce(
+          makeStreamChunks(["recovered"], { prompt_tokens: 5, completion_tokens: 3 }),
+        );
+
+      const result = await provider.openaiProvider.draft(config, { userPrompt: "test" });
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.content).toBe("recovered");
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+    });
+
+    it("should exhaust retries on persistent 503 in draft", async () => {
+      const error503 = new MockAPIError(503, "Service unavailable");
+      mockCreate.mockRejectedValue(error503);
+
+      const result = await provider.openaiProvider.draft(config, { userPrompt: "test" });
+
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error).toBe("API error (503): Service unavailable");
+      expect(mockCreate).toHaveBeenCalledTimes(3); // 1 + 2 retries
+    });
+
+    it("should retry connection error in draft", async () => {
+      mockCreate
+        .mockRejectedValueOnce(new MockAPIConnectionError())
+        .mockResolvedValueOnce(
+          makeStreamChunks(["ok"], { prompt_tokens: 1, completion_tokens: 1 }),
+        );
+
+      const result = await provider.openaiProvider.draft(config, { userPrompt: "test" });
+
+      expect(result.success).toBe(true);
+      expect(mockCreate).toHaveBeenCalledTimes(2);
     });
   });
 

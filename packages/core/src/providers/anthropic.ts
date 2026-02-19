@@ -8,6 +8,7 @@ import type {
   ProviderResult,
 } from "./types.js";
 import { withStructuredRetry } from "./structured-retry.js";
+import { withTransientRetry } from "./transient-retry.js";
 
 const DEFAULT_MODEL = "claude-opus-4-6";
 const MAX_TOKENS = 8192;
@@ -20,8 +21,9 @@ function formatError(error: unknown): string {
   if (error instanceof Anthropic.AuthenticationError) return "Invalid API key";
   if (error instanceof Anthropic.RateLimitError) return "Rate limit exceeded";
   if (error instanceof Anthropic.APIConnectionError) return "Connection failed";
-  if (error instanceof Anthropic.APIError)
+  if (error instanceof Anthropic.APIError) {
     return `API error (${error.status}): ${error.message}`;
+  }
   return error instanceof Error ? error.message : String(error);
 }
 
@@ -29,38 +31,40 @@ async function draft(
   config: ProviderConfig,
   request: DraftRequest,
 ): Promise<ProviderResult<DraftResponse>> {
-  const start = Date.now();
   try {
     const client = createClient(config.apiKey);
     const model = config.model ?? DEFAULT_MODEL;
-    const stream = client.messages.stream({
-      model,
-      max_tokens: MAX_TOKENS,
-      system: request.systemPrompt ?? "",
-      messages: [{ role: "user", content: request.userPrompt }],
-    });
 
-    let content = "";
-    for await (const event of stream) {
-      if (
-        event.type === "content_block_delta" &&
-        event.delta.type === "text_delta"
-      ) {
-        content += event.delta.text;
+    const data = await withTransientRetry(async () => {
+      const start = Date.now();
+      const stream = client.messages.stream({
+        model,
+        max_tokens: MAX_TOKENS,
+        system: request.systemPrompt ?? "",
+        messages: [{ role: "user", content: request.userPrompt }],
+      });
+
+      let content = "";
+      for await (const event of stream) {
+        if (
+          event.type === "content_block_delta" &&
+          event.delta.type === "text_delta"
+        ) {
+          content += event.delta.text;
+        }
       }
-    }
 
-    const final = await stream.finalMessage();
-    return {
-      success: true,
-      data: {
+      const final = await stream.finalMessage();
+      return {
         content,
         model,
         tokensIn: final.usage.input_tokens,
         tokensOut: final.usage.output_tokens,
         durationMs: Date.now() - start,
-      },
-    };
+      };
+    });
+
+    return { success: true, data };
   } catch (error) {
     return { success: false, error: formatError(error) };
   }
@@ -78,22 +82,26 @@ async function structuredOutput<T>(
       ? `${request.userPrompt}\n\n${retryPrompt}`
       : request.userPrompt;
 
+    // Transient retry (429/5xx/connection) nests inside structured retry (JSON parse).
+    // Worst case: 3 structured × 3 transient = 9 API calls.
     let response;
     try {
-      response = await client.messages.create({
-        model,
-        max_tokens: MAX_TOKENS,
-        system: request.systemPrompt,
-        messages: [{ role: "user", content: userContent }],
-        tools: [
-          {
-            name: request.toolName,
-            description: request.toolDescription,
-            input_schema: request.schema as Anthropic.Tool.InputSchema,
-          },
-        ],
-        tool_choice: { type: "tool" as const, name: request.toolName },
-      });
+      response = await withTransientRetry(() =>
+        client.messages.create({
+          model,
+          max_tokens: MAX_TOKENS,
+          system: request.systemPrompt,
+          messages: [{ role: "user", content: userContent }],
+          tools: [
+            {
+              name: request.toolName,
+              description: request.toolDescription,
+              input_schema: request.schema as Anthropic.Tool.InputSchema,
+            },
+          ],
+          tool_choice: { type: "tool" as const, name: request.toolName },
+        }),
+      );
     } catch (error) {
       throw new Error(formatError(error));
     }
