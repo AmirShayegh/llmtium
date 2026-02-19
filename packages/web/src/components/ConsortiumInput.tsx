@@ -74,7 +74,7 @@ export function ConsortiumInput({ store }: ConsortiumInputProps) {
         onChange={(e) => setPrompt(e.target.value)}
         onKeyDown={handleKeyDown}
         disabled={isRunning}
-        className="min-h-[160px] resize-y font-mono text-sm"
+        className="min-h-[160px] max-h-[400px] resize-y overflow-y-auto font-mono text-sm"
       />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

@@ -12,6 +12,7 @@ import type {
   ProviderWithConfig,
 } from "../types/pipeline.js";
 import { anonymize, shuffleForReviewer } from "./anonymizer.js";
+import { sanitizeReview, sanitizeSynthesis } from "./sanitize.js";
 import type { AnonymizedResponse } from "../types/anonymizer.js";
 
 const MIN_DRAFTS = 2;
@@ -208,8 +209,16 @@ async function runReviewStage(
       errors.push({ stage: "review", model: modelId, error: outcome.value.error });
       emit({ stage: "review", model: modelId, status: "failed", error: outcome.value.error });
     } else {
-      reviews.set(modelId, { status: "success", review: outcome.value.data });
-      emit({ stage: "review", model: modelId, status: "complete", review: outcome.value.data });
+      try {
+        const sanitized = sanitizeReview(outcome.value.data);
+        reviews.set(modelId, { status: "success", review: sanitized });
+        emit({ stage: "review", model: modelId, status: "complete", review: sanitized });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        reviews.set(modelId, { status: "failed", error: msg });
+        errors.push({ stage: "review", model: modelId, error: msg });
+        emit({ stage: "review", model: modelId, status: "failed", error: msg });
+      }
     }
   }
 
@@ -264,8 +273,18 @@ async function runSynthesisStage(
     return null;
   }
 
-  emit({ stage: "synthesis", status: "complete", result: result.data });
-  return result.data;
+  let sanitized: SynthesisResponse;
+  try {
+    sanitized = sanitizeSynthesis(result.data);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    errors.push({ stage: "synthesis", model: synthModelId, error: msg });
+    emit({ stage: "synthesis", model: synthModelId, status: "failed", error: msg });
+    return null;
+  }
+
+  emit({ stage: "synthesis", model: synthModelId, status: "complete", result: sanitized });
+  return sanitized;
 }
 
 // --- Helpers ---

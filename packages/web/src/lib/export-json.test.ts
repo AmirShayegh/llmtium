@@ -6,14 +6,15 @@ import type { SerializedWorkflowResult } from "./serialize";
 
 function makeFixture(): ExportData {
   const review: CrossReview = {
-    scores: {
-      "Response A": { correctness: 4, completeness: 3, actionability: 5, clarity: 4 },
-    },
+    scores: [
+      { response_id: "Response A", correctness: 4, completeness: 3, actionability: 5, clarity: 4 },
+    ],
     issues: ["Minor issue"],
     disagreements: [],
     missing_info: [],
     confidence: 0.8,
     confidence_reason: "High agreement",
+    notes: "",
   };
 
   const synthesis: SynthesisResponse = {

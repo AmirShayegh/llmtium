@@ -37,7 +37,7 @@ function ScoreRow({
       {SCORE_LABELS.map((dim) => (
         <span key={dim} className="font-mono text-xs tabular-nums">
           <span className="text-muted-foreground/60">{dim.slice(0, 4)}</span>{" "}
-          <span className="text-foreground">{scores[dim]}</span>
+          <span className="text-foreground">{Number(scores[dim])}</span>
         </span>
       ))}
     </div>
@@ -92,14 +92,14 @@ function ReviewCard({
           {reviewerName}
         </span>
         <span className="font-mono text-xs tabular-nums text-muted-foreground">
-          confidence {review.confidence.toFixed(2)}
+          confidence {Number(review.confidence).toFixed(2)}
         </span>
       </div>
 
       {/* Scores */}
       <div className="space-y-1">
-        {Object.entries(review.scores).map(([label, scores]) => (
-          <ScoreRow key={label} responseLabel={label} scores={scores} mapping={mapping} />
+        {review.scores.map((s) => (
+          <ScoreRow key={s.response_id} responseLabel={s.response_id} scores={s} mapping={mapping} />
         ))}
       </div>
 

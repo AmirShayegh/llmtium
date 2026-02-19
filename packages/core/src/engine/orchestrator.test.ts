@@ -42,12 +42,15 @@ function reviewSuccess(overrides?: Partial<CrossReview>): ProviderResult<CrossRe
   return {
     success: true,
     data: {
-      scores: {},
+      scores: [
+        { response_id: "Response A", correctness: 4, completeness: 3, actionability: 5, clarity: 4 },
+      ],
       issues: [],
       disagreements: [],
       missing_info: [],
       confidence: 0.8,
       confidence_reason: "test",
+      notes: "",
       ...overrides,
     },
   };
@@ -424,6 +427,70 @@ describe("orchestrator", () => {
       expect(result.errors.some((e) => e.stage === "synthesis" && e.error.includes("synth prompt boom"))).toBe(
         true,
       );
+    });
+  });
+
+  describe("sanitize failure paths", () => {
+    it("should mark review as failed when sanitizeReview throws (vacuous review)", async () => {
+      const { config, p1 } = buildHappyConfig();
+      // Return a vacuous review: empty scores, empty issues, empty disagreements
+      (p1.provider.structuredOutput as ReturnType<typeof vi.fn>).mockResolvedValue(
+        reviewSuccess({ scores: [], issues: [], disagreements: [] }),
+      );
+
+      const result = await runPipeline(config);
+
+      expect(result.reviews.get("anthropic")?.status).toBe("failed");
+      expect(result.errors.some((e) => e.stage === "review" && e.model === "anthropic" && e.error.includes("vacuous"))).toBe(true);
+      // Other reviews should still succeed
+      expect(result.reviews.get("openai")?.status).toBe("success");
+      expect(result.reviews.get("google")?.status).toBe("success");
+      // Synthesis should still run (2 successful reviews remain)
+      expect(result.synthesis).not.toBeNull();
+    });
+
+    it("should emit review:failed event when sanitizeReview throws", async () => {
+      const { config, p1 } = buildHappyConfig();
+      (p1.provider.structuredOutput as ReturnType<typeof vi.fn>).mockResolvedValue(
+        reviewSuccess({ scores: [], issues: [], disagreements: [] }),
+      );
+
+      const events: PipelineEvent[] = [];
+      config.onProgress = (e) => events.push(e);
+
+      await runPipeline(config);
+
+      const reviewFailed = events.filter((e) => e.stage === "review" && e.status === "failed");
+      expect(reviewFailed).toHaveLength(1);
+      expect(reviewFailed[0]!.model).toBe("anthropic");
+    });
+
+    it("should return null synthesis when sanitizeSynthesis throws (empty output)", async () => {
+      const { config } = buildHappyConfig();
+      (config.synthesizer.provider.structuredOutput as ReturnType<typeof vi.fn>).mockResolvedValue(
+        synthesisSuccess({ output: "" }),
+      );
+
+      const result = await runPipeline(config);
+
+      expect(result.synthesis).toBeNull();
+      expect(result.status).toBe("partial");
+      expect(result.errors.some((e) => e.stage === "synthesis" && e.error.includes("empty or missing"))).toBe(true);
+    });
+
+    it("should emit synthesis:failed event when sanitizeSynthesis throws", async () => {
+      const { config } = buildHappyConfig();
+      (config.synthesizer.provider.structuredOutput as ReturnType<typeof vi.fn>).mockResolvedValue(
+        synthesisSuccess({ output: null as unknown as string }),
+      );
+
+      const events: PipelineEvent[] = [];
+      config.onProgress = (e) => events.push(e);
+
+      await runPipeline(config);
+
+      const synthFailed = events.filter((e) => e.stage === "synthesis" && e.status === "failed");
+      expect(synthFailed).toHaveLength(1);
     });
   });
 

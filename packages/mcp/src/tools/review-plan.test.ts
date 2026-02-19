@@ -55,12 +55,13 @@ function makePipelineResult(overrides?: Partial<PipelineResult>): PipelineResult
     durationMs: 500,
   };
   const review: CrossReview = {
-    scores: {},
+    scores: [],
     issues: [],
     disagreements: [],
     missing_info: [],
     confidence: 0.8,
     confidence_reason: "Test",
+    notes: "",
   };
   return {
     status: "success",

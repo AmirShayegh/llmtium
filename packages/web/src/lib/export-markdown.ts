@@ -64,17 +64,16 @@ function formatReviews(
   const lines = ["## Cross-Reviews", ""];
 
   for (const [reviewerId, review] of entries) {
-    lines.push(`### Review by ${modelName(reviewerId)} (confidence: ${review.confidence.toFixed(2)})`, "");
+    lines.push(`### Review by ${modelName(reviewerId)} (confidence: ${Number(review.confidence).toFixed(2)})`, "");
 
     // Scores table
-    const scoreEntries = Object.entries(review.scores);
-    if (scoreEntries.length > 0) {
+    if (review.scores.length > 0) {
       lines.push("#### Scores", "");
       lines.push("| Response | Corr | Comp | Action | Clarity |");
       lines.push("|----------|------|------|--------|---------|");
-      for (const [label, scores] of scoreEntries) {
-        const name = resolveLabel(label, mapping);
-        lines.push(`| ${name} | ${scores.correctness} | ${scores.completeness} | ${scores.actionability} | ${scores.clarity} |`);
+      for (const s of review.scores) {
+        const name = resolveLabel(s.response_id, mapping);
+        lines.push(`| ${name} | ${Number(s.correctness)} | ${Number(s.completeness)} | ${Number(s.actionability)} | ${Number(s.clarity)} |`);
       }
       lines.push("");
     }
@@ -86,6 +85,9 @@ function formatReviews(
         const aName = resolveLabel(d.a.response_id, mapping);
         const bName = resolveLabel(d.b.response_id, mapping);
         lines.push(`- **${d.topic}**: ${aName} ("${d.a.quote}") vs ${bName} ("${d.b.quote}") \u2014 ${d.assessment}`);
+        if (d.suggested_resolution) {
+          lines.push(`  - *Resolution:* ${d.suggested_resolution}`);
+        }
       }
       lines.push("");
     }
@@ -116,7 +118,7 @@ function formatSynthesis(
   data: ExportData,
 ): string {
   const { synthesis, mapping } = data;
-  const lines = [`## Synthesis (confidence: ${synthesis.confidence.toFixed(2)})`, ""];
+  const lines = [`## Synthesis (confidence: ${Number(synthesis.confidence).toFixed(2)})`, ""];
 
   lines.push(synthesis.output, "");
 

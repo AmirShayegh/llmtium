@@ -93,10 +93,10 @@ function buildReviewPrompt(params: ReviewPromptParams): { systemPrompt: string; 
 
   const responseLabels = params.responses.map((r) => r.label);
   const scorePlaceholders = responseLabels
-    .map((label) => `    "${label}": {\n      "correctness": "<1-5>",\n      "completeness": "<1-5>",\n      "actionability": "<1-5>",\n      "clarity": "<1-5>"\n    }`)
+    .map((label) => `    {\n      "response_id": "${label}",\n      "correctness": "<1-5>",\n      "completeness": "<1-5>",\n      "actionability": "<1-5>",\n      "clarity": "<1-5>"\n    }`)
     .join(",\n");
 
-  const userPrompt = `## Original Prompt\n\n${params.userPrompt}\n\n## Responses to Review\n\n${responseSections}\n\n## Your Task\n\nEvaluate these responses against the original prompt. Produce a JSON review with:\n- Scores (1-5) for each response on correctness, completeness, actionability, and clarity\n- The most important issues you found across all responses\n- Explicit disagreements between responses, with direct quotes\n- Information that is missing from ALL responses\n- Your confidence level (0-1) in your own assessment\n\nRespond with ONLY this JSON structure:\n\n{\n  "scores": {\n${scorePlaceholders}\n  },\n  "issues": [\n    "Issue description referencing which response(s) it applies to"\n  ],\n  "disagreements": [\n    {\n      "topic": "What the disagreement is about",\n      "a": {\n        "response_id": "Response A",\n        "quote": "Exact quote from Response A"\n      },\n      "b": {\n        "response_id": "Response B",\n        "quote": "Exact quote from Response B"\n      },\n      "assessment": "Your analysis of who is more correct and why",\n      "suggested_resolution": "How to resolve this (optional)"\n    }\n  ],\n  "missing_info": [\n    "Important information or consideration that no response addressed"\n  ],\n  "confidence": "<0.0-1.0>",\n  "confidence_reason": "Why you are this confident in your review",\n  "notes": "Any additional observations (optional, null if none)"\n}`;
+  const userPrompt = `## Original Prompt\n\n${params.userPrompt}\n\n## Responses to Review\n\n${responseSections}\n\n## Your Task\n\nEvaluate these responses against the original prompt. Produce a JSON review with:\n- Scores (1-5) for each response on correctness, completeness, actionability, and clarity\n- The most important issues you found across all responses\n- Explicit disagreements between responses, with direct quotes\n- Information that is missing from ALL responses\n- Your confidence level (0-1) in your own assessment\n\nRespond with ONLY this JSON structure:\n\n{\n  "scores": [\n${scorePlaceholders}\n  ],\n  "issues": [\n    "Issue description referencing which response(s) it applies to"\n  ],\n  "disagreements": [\n    {\n      "topic": "What the disagreement is about",\n      "a": {\n        "response_id": "Response A",\n        "quote": "Exact quote from Response A"\n      },\n      "b": {\n        "response_id": "Response B",\n        "quote": "Exact quote from Response B"\n      },\n      "assessment": "Your analysis of who is more correct and why",\n      "suggested_resolution": "How to resolve this, or empty string if none"\n    }\n  ],\n  "missing_info": [\n    "Important information or consideration that no response addressed"\n  ],\n  "confidence": "<0.0-1.0>",\n  "confidence_reason": "Why you are this confident in your review",\n  "notes": "Any additional observations, or empty string if none"\n}`;
 
   return { systemPrompt: CROSS_REVIEW_SYSTEM_PROMPT, userPrompt };
 }
@@ -108,8 +108,8 @@ function buildSynthesisPrompt(params: SynthesisPromptParams): { systemPrompt: st
 
   const reviewSections = params.reviews
     .map(({ reviewerId, review }) => {
-      const scoreLines = Object.entries(review.scores)
-        .map(([label, s]) => `- ${label}: correctness=${s.correctness}, completeness=${s.completeness}, actionability=${s.actionability}, clarity=${s.clarity}`)
+      const scoreLines = review.scores
+        .map((s) => `- ${s.response_id}: correctness=${s.correctness}, completeness=${s.completeness}, actionability=${s.actionability}, clarity=${s.clarity}`)
         .join("\n");
 
       const issues = review.issues.join("; ");

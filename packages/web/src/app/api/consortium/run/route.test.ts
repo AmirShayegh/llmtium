@@ -51,7 +51,7 @@ function mockWorkflowResult(): WorkflowResult {
     input: { prompt: "Test", workflow: "review_plan", models: ["anthropic/claude"], synthesizer: "anthropic/claude" },
     stages: {
       drafts: new Map([["anthropic", { status: "success" as const, response: { content: "Draft", model: "claude", tokensIn: 10, tokensOut: 20, durationMs: 100 } }]]),
-      reviews: new Map([["anthropic", { status: "success" as const, review: { scores: {}, issues: [], disagreements: [], missing_info: [], confidence: 0.8, confidence_reason: "test" } }]]),
+      reviews: new Map([["anthropic", { status: "success" as const, review: { scores: [], issues: [], disagreements: [], missing_info: [], confidence: 0.8, confidence_reason: "test", notes: "" } }]]),
       synthesis: { output: "Synthesized", resolved_disagreements: [], open_questions: [], action_items: [], confidence: 0.9, confidence_reason: "good" },
       mapping: new Map([["Response A", "anthropic"]]),
     },
@@ -60,7 +60,7 @@ function mockWorkflowResult(): WorkflowResult {
     pipeline: {
       status: "success",
       drafts: new Map([["anthropic", { status: "success" as const, response: { content: "Draft", model: "claude", tokensIn: 10, tokensOut: 20, durationMs: 100 } }]]),
-      reviews: new Map([["anthropic", { status: "success" as const, review: { scores: {}, issues: [], disagreements: [], missing_info: [], confidence: 0.8, confidence_reason: "test" } }]]),
+      reviews: new Map([["anthropic", { status: "success" as const, review: { scores: [], issues: [], disagreements: [], missing_info: [], confidence: 0.8, confidence_reason: "test", notes: "" } }]]),
       synthesis: { output: "Synthesized", resolved_disagreements: [], open_questions: [], action_items: [], confidence: 0.9, confidence_reason: "good" },
       mapping: new Map([["Response A", "anthropic"]]),
       errors: [],
@@ -97,9 +97,9 @@ describe("POST /api/consortium/run", () => {
       input.onProgress?.({ stage: "draft", model: "anthropic", status: "started" });
       input.onProgress?.({ stage: "draft", model: "anthropic", status: "complete", response: "Draft A" });
       input.onProgress?.({ stage: "review", model: "anthropic", status: "started" });
-      input.onProgress?.({ stage: "review", model: "anthropic", status: "complete", review: { scores: {}, issues: [], disagreements: [], missing_info: [], confidence: 0.8, confidence_reason: "test" } });
+      input.onProgress?.({ stage: "review", model: "anthropic", status: "complete", review: { scores: [], issues: [], disagreements: [], missing_info: [], confidence: 0.8, confidence_reason: "test", notes: "" } });
       input.onProgress?.({ stage: "synthesis", model: "anthropic", status: "started" });
-      input.onProgress?.({ stage: "synthesis", status: "complete", result: { output: "Synthesized", resolved_disagreements: [], open_questions: [], action_items: [], confidence: 0.9, confidence_reason: "good" } });
+      input.onProgress?.({ stage: "synthesis", model: "anthropic", status: "complete", result: { output: "Synthesized", resolved_disagreements: [], open_questions: [], action_items: [], confidence: 0.9, confidence_reason: "good" } });
       return mockWorkflowResult();
     });
 

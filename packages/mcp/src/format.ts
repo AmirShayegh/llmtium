@@ -42,7 +42,7 @@ function formatSuccess(result: WorkflowResult): string {
     }
 
     lines.push("=== CONFIDENCE ===", "");
-    lines.push(`${synthesis.confidence.toFixed(2)} \u2014 ${synthesis.confidence_reason}`);
+    lines.push(`${Number(synthesis.confidence).toFixed(2)} \u2014 ${synthesis.confidence_reason}`);
     lines.push("");
   }
 

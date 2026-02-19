@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { initCrypto, resetCrypto, encrypt } from "@/lib/crypto";
 import { createKeysStore, getKeysStore } from "./keys";
 import type { KeysState } from "./keys";

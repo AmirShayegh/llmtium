@@ -1,5 +1,6 @@
 export type {
   ReviewScore,
+  ResponseScore,
   Disagreement,
   CrossReview,
 } from "./cross-review.js";

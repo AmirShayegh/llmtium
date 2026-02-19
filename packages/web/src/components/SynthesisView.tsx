@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useStore } from "zustand";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ExportButton } from "@/components/ExportButton";
+import { MarkdownContent } from "@/components/markdown-content";
 import { PROVIDER_META } from "@/lib/provider-meta";
 import type { ConsortiumState } from "@/store/consortium";
 import type { ResolvedDisagreement } from "@llmtium/core";
@@ -87,6 +89,38 @@ export function SynthesisView({ store }: SynthesisViewProps) {
   const synthesis = useStore(store, (s) => s.synthesis);
   const mapping = useStore(store, (s) => s.mapping);
   const synthStage = useStore(store, (s) => s.stages.synthesis);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
+
+  const resetCopyAfterDelay = useCallback(() => {
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopyState("idle"), 1500);
+  }, []);
+
+  const handleCopy = useCallback(() => {
+    if (!synthesis) return;
+    if (!navigator.clipboard) {
+      setCopyState("failed");
+      resetCopyAfterDelay();
+      return;
+    }
+    navigator.clipboard.writeText(synthesis.output).then(
+      () => {
+        setCopyState("copied");
+        resetCopyAfterDelay();
+      },
+      () => {
+        setCopyState("failed");
+        resetCopyAfterDelay();
+      },
+    );
+  }, [synthesis, resetCopyAfterDelay]);
 
   if (!synthesis) {
     if (synthStage.status === "running") {
@@ -107,17 +141,35 @@ export function SynthesisView({ store }: SynthesisViewProps) {
           Synthesized Output
         </h3>
         <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={handleCopy}>
+            {copyState === "copied" ? (
+              <>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="mr-1.5">
+                  <path d="M3 7.5l2.5 2.5L11 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Copied!
+              </>
+            ) : copyState === "failed" ? (
+              "Copy failed"
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="mr-1.5">
+                  <rect x="4.5" y="4.5" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.2" />
+                  <path d="M9.5 4.5V3a1 1 0 00-1-1H3a1 1 0 00-1 1v5.5a1 1 0 001 1h1.5" stroke="currentColor" strokeWidth="1.2" />
+                </svg>
+                Copy
+              </>
+            )}
+          </Button>
           <ExportButton store={store} />
           <span className="font-mono text-xs tabular-nums text-muted-foreground">
-            confidence {synthesis.confidence.toFixed(2)}
+            confidence {Number(synthesis.confidence).toFixed(2)}
           </span>
         </div>
       </div>
 
       {/* Main output */}
-      <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-        {synthesis.output}
-      </div>
+      <MarkdownContent content={synthesis.output} />
 
       {/* Resolved disagreements */}
       {synthesis.resolved_disagreements.length > 0 && (

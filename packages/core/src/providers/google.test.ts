@@ -196,14 +196,16 @@ describe("googleProvider", () => {
         type: "object",
         properties: {
           scores: {
-            type: "object",
-            additionalProperties: {
+            type: "array",
+            items: {
               type: "object",
               properties: {
+                response_id: { type: "string" },
                 correctness: { type: "number" },
                 completeness: { type: "number" },
               },
-              required: ["correctness", "completeness"],
+              required: ["response_id", "correctness", "completeness"],
+              additionalProperties: false,
             },
           },
           disagreements: {
@@ -219,18 +221,21 @@ describe("googleProvider", () => {
                     quote: { type: "string" },
                   },
                   required: ["response_id", "quote"],
+                  additionalProperties: false,
                 },
               },
               required: ["topic", "a"],
+              additionalProperties: false,
             },
           },
         },
         required: ["scores", "disagreements"],
+        additionalProperties: false,
       };
 
       mockGenerateContent.mockResolvedValue(
         makeContentResult(JSON.stringify({
-          scores: { A: { correctness: 4, completeness: 3 } },
+          scores: [{ response_id: "A", correctness: 4, completeness: 3 }],
           disagreements: [],
         })),
       );

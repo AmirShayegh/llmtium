@@ -6,10 +6,10 @@ import type { SerializedWorkflowResult } from "./serialize";
 
 function makeReview(overrides?: Partial<CrossReview>): CrossReview {
   return {
-    scores: {
-      "Response A": { correctness: 4, completeness: 3, actionability: 5, clarity: 4 },
-      "Response B": { correctness: 3, completeness: 4, actionability: 3, clarity: 5 },
-    },
+    scores: [
+      { response_id: "Response A", correctness: 4, completeness: 3, actionability: 5, clarity: 4 },
+      { response_id: "Response B", correctness: 3, completeness: 4, actionability: 3, clarity: 5 },
+    ],
     issues: ["Lacks error handling details"],
     disagreements: [
       {
@@ -23,6 +23,7 @@ function makeReview(overrides?: Partial<CrossReview>): CrossReview {
     missing_info: ["Deployment strategy"],
     confidence: 0.85,
     confidence_reason: "Mostly aligned",
+    notes: "",
     ...overrides,
   };
 }
@@ -148,6 +149,19 @@ describe("exportToMarkdown", () => {
     expect(md).toContain("OpenAI");
     expect(md).toContain("Use SQLite");
     expect(md).toContain("PostgreSQL is better for production");
+  });
+
+  it("should include suggested_resolution when non-empty", () => {
+    const md = exportToMarkdown(makeFixture());
+    expect(md).toContain("*Resolution:* Go with PostgreSQL");
+  });
+
+  it("should omit suggested_resolution when empty", () => {
+    const fixture = makeFixture();
+    fixture.reviews.anthropic!.disagreements[0]!.suggested_resolution = "";
+    fixture.reviews.openai!.disagreements[0]!.suggested_resolution = "";
+    const md = exportToMarkdown(fixture);
+    expect(md).not.toContain("*Resolution:*");
   });
 
   it("should contain synthesis output text and confidence", () => {

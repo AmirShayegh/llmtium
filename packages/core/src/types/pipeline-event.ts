@@ -9,5 +9,5 @@ export type PipelineEvent =
   | { stage: "review"; model: string; status: "complete"; review: CrossReview }
   | { stage: "review"; model: string; status: "failed"; error: string }
   | { stage: "synthesis"; model: string; status: "started" }
-  | { stage: "synthesis"; status: "complete"; result: SynthesisResponse }
+  | { stage: "synthesis"; model: string; status: "complete"; result: SynthesisResponse }
   | { stage: "synthesis"; model: string; status: "failed"; error: string };

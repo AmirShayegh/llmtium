@@ -48,6 +48,24 @@ function makeStage(): StageState {
   return { status: "pending", models: {}, durationMs: null, startedAt: null };
 }
 
+function errorKey(e: PipelineError): string {
+  return JSON.stringify([e.stage, e.model, e.error]);
+}
+
+function mergeErrors(existing: PipelineError[], incoming: PipelineError[]): PipelineError[] {
+  if (incoming.length === 0) return existing;
+  const seen = new Set(existing.map(errorKey));
+  const novel: PipelineError[] = [];
+  for (const e of incoming) {
+    const k = errorKey(e);
+    if (!seen.has(k)) {
+      seen.add(k);
+      novel.push(e);
+    }
+  }
+  return novel.length === 0 ? existing : [...existing, ...novel];
+}
+
 function makeInitialState() {
   return {
     runStatus: "idle" as RunStatus,
@@ -217,17 +235,25 @@ export function createConsortiumStore(options?: ConsortiumStoreOptions) {
 
           const mapping = result?.stages?.mapping as Record<string, string> | null ?? null;
 
+          // Merge any pipeline errors not already captured from stage events
+          const resultErrors = (result?.errors ?? result?.pipeline?.errors) as PipelineError[] | undefined;
+          const mergedErrors = resultErrors
+            ? mergeErrors(state.errors, resultErrors)
+            : state.errors;
+
           if (status === "complete") {
             return {
               runStatus: "complete" as RunStatus,
               result: result ?? null,
               mapping,
+              errors: mergedErrors,
               stages: { draft, review, synthesis },
             };
           } else {
             return {
               runStatus: "error" as RunStatus,
               errorMessage: (event.error as string) ?? "Unknown error",
+              errors: mergedErrors,
               stages: { draft, review, synthesis },
             };
           }

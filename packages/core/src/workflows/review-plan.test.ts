@@ -39,12 +39,13 @@ function makeSuccessPipelineResult(overrides?: Partial<PipelineResult>): Pipelin
   };
 
   const review: CrossReview = {
-    scores: { "Response A": { correctness: 4, completeness: 3, actionability: 5, clarity: 4 } },
+    scores: [{ response_id: "Response A", correctness: 4, completeness: 3, actionability: 5, clarity: 4 }],
     issues: ["Test issue"],
     disagreements: [],
     missing_info: [],
     confidence: 0.8,
     confidence_reason: "Test confidence",
+    notes: "",
   };
 
   const synthesis: SynthesisResponse = {
@@ -192,7 +193,7 @@ describe("reviewPlan", () => {
           {
             reviewerId: "anthropic",
             review: {
-              scores: { "Response B": { correctness: 4, completeness: 3, actionability: 5, clarity: 4 } },
+              scores: [{ response_id: "Response B", correctness: 4, completeness: 3, actionability: 5, clarity: 4 }],
               issues: ["Missing error handling"],
               disagreements: [
                 {
@@ -200,11 +201,13 @@ describe("reviewPlan", () => {
                   a: { response_id: "Response A", quote: "Use PostgreSQL" },
                   b: { response_id: "Response B", quote: "Use SQLite" },
                   assessment: "PostgreSQL is better at scale",
+                  suggested_resolution: "",
                 },
               ],
               missing_info: ["No backup strategy"],
               confidence: 0.85,
               confidence_reason: "Domain expertise",
+              notes: "",
             },
           },
         ],

@@ -44,12 +44,13 @@ function makeSynthesis(overrides?: Partial<SynthesisResponse>): SynthesisRespons
 
 function makeReview(): CrossReview {
   return {
-    scores: { "Response A": { correctness: 4, completeness: 3, actionability: 5, clarity: 4 } },
+    scores: [{ response_id: "Response A", correctness: 4, completeness: 3, actionability: 5, clarity: 4 }],
     issues: ["Lacks error handling"],
     disagreements: [],
     missing_info: [],
     confidence: 0.85,
     confidence_reason: "Mostly aligned",
+    notes: "",
   };
 }
 

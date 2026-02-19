@@ -2,6 +2,7 @@
 
 import { useStore } from "zustand";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MarkdownContent } from "@/components/markdown-content";
 import { PROVIDER_META } from "@/lib/provider-meta";
 import type { ConsortiumState } from "@/store/consortium";
 import type { StoreApi } from "zustand";
@@ -45,9 +46,7 @@ export function ResponseTabs({ store }: ResponseTabsProps) {
                 {errors.find((e) => e.stage === "draft" && e.model === id)?.error ?? "Draft failed for this model."}
               </p>
             ) : content ? (
-              <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-foreground">
-                {content}
-              </div>
+              <MarkdownContent content={content} />
             ) : (
               <p className="animate-pulse text-sm text-muted-foreground">
                 Awaiting response...

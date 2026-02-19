@@ -6,14 +6,15 @@ import type { CrossReview, SynthesisResponse } from "@llmtium/core";
 
 function makeCrossReview(overrides?: Partial<CrossReview>): CrossReview {
   return {
-    scores: {
-      "Response A": { correctness: 4, completeness: 3, actionability: 5, clarity: 4 },
-    },
+    scores: [
+      { response_id: "Response A", correctness: 4, completeness: 3, actionability: 5, clarity: 4 },
+    ],
     issues: ["Minor issue"],
     disagreements: [],
     missing_info: [],
     confidence: 0.8,
     confidence_reason: "High agreement",
+    notes: "",
     ...overrides,
   };
 }
@@ -195,7 +196,7 @@ describe("consortium store", () => {
     it("should store SynthesisResponse on synthesis:complete", () => {
       const result = makeSynthesisResponse();
       store.getState().handleEvent({
-        stage: "synthesis", status: "complete", result,
+        stage: "synthesis", model: "anthropic", status: "complete", result,
       });
 
       const state = store.getState();
@@ -540,6 +541,109 @@ describe("consortium store", () => {
 
       expect(s.getState().runStatus).toBe("error");
       expect(s.getState().errorMessage).toBe("Stream ended unexpectedly");
+    });
+  });
+
+  describe("mergeErrors via done handler", () => {
+    beforeEach(() => {
+      store.setState({
+        runStatus: "running",
+        models: ["anthropic", "openai"],
+        stages: {
+          draft: { status: "complete", models: { anthropic: "complete", openai: "complete" }, durationMs: null, startedAt: null },
+          review: { status: "complete", models: { anthropic: "complete", openai: "complete" }, durationMs: null, startedAt: null },
+          synthesis: { status: "complete", models: { anthropic: "complete" }, durationMs: null, startedAt: null },
+        },
+      });
+    });
+
+    it("should merge novel pipeline errors into state on done", () => {
+      // Add an existing error from SSE events
+      store.setState({
+        errors: [{ stage: "draft", model: "google", error: "API error" }],
+      });
+
+      store.getState().handleEvent({
+        stage: "done",
+        status: "complete",
+        result: {
+          status: "partial",
+          stages: { mapping: null },
+          telemetry: { stageDurationMs: { draft: 100, review: 200, synthesis: 50 } },
+          errors: [
+            { stage: "draft", model: "google", error: "API error" },  // duplicate
+            { stage: "review", model: "openai", error: "Parse failed" },  // novel
+          ],
+        },
+      });
+
+      const errors = store.getState().errors;
+      expect(errors).toHaveLength(2);
+      expect(errors).toContainEqual({ stage: "draft", model: "google", error: "API error" });
+      expect(errors).toContainEqual({ stage: "review", model: "openai", error: "Parse failed" });
+    });
+
+    it("should not duplicate errors when all are already present", () => {
+      store.setState({
+        errors: [
+          { stage: "draft", model: "google", error: "API error" },
+          { stage: "review", model: "openai", error: "Parse failed" },
+        ],
+      });
+
+      store.getState().handleEvent({
+        stage: "done",
+        status: "complete",
+        result: {
+          status: "partial",
+          stages: { mapping: null },
+          telemetry: { stageDurationMs: { draft: 100, review: 200, synthesis: 50 } },
+          errors: [
+            { stage: "draft", model: "google", error: "API error" },
+            { stage: "review", model: "openai", error: "Parse failed" },
+          ],
+        },
+      });
+
+      expect(store.getState().errors).toHaveLength(2);
+    });
+
+    it("should deduplicate errors within the incoming batch", () => {
+      store.getState().handleEvent({
+        stage: "done",
+        status: "complete",
+        result: {
+          status: "partial",
+          stages: { mapping: null },
+          telemetry: { stageDurationMs: { draft: 100, review: 200, synthesis: 50 } },
+          errors: [
+            { stage: "draft", model: "google", error: "API error" },
+            { stage: "draft", model: "google", error: "API error" },  // duplicate within batch
+          ],
+        },
+      });
+
+      const errors = store.getState().errors;
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toEqual({ stage: "draft", model: "google", error: "API error" });
+    });
+
+    it("should preserve existing errors when result has no errors", () => {
+      store.setState({
+        errors: [{ stage: "draft", model: "google", error: "API error" }],
+      });
+
+      store.getState().handleEvent({
+        stage: "done",
+        status: "complete",
+        result: {
+          status: "success",
+          stages: { mapping: null },
+          telemetry: { stageDurationMs: { draft: 100, review: 200, synthesis: 50 } },
+        },
+      });
+
+      expect(store.getState().errors).toHaveLength(1);
     });
   });
 

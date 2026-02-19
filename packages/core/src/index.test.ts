@@ -32,14 +32,15 @@ describe("@llmtium/core", () => {
   describe("CrossReview schema", () => {
     it("should enforce the correct shape with all required fields", () => {
       const review: CrossReview = {
-        scores: {
-          "Response A": {
+        scores: [
+          {
+            response_id: "Response A",
             correctness: 4,
             completeness: 3,
             actionability: 5,
             clarity: 4,
           },
-        },
+        ],
         issues: ["Missing error handling for edge case"],
         disagreements: [
           {
@@ -47,26 +48,28 @@ describe("@llmtium/core", () => {
             a: { response_id: "Response A", quote: "Use PostgreSQL" },
             b: { response_id: "Response B", quote: "Use SQLite" },
             assessment: "PostgreSQL is more appropriate at scale",
+            suggested_resolution: "",
           },
         ],
         missing_info: ["No mention of backup strategy"],
         confidence: 0.85,
         confidence_reason: "High familiarity with the domain",
+        notes: "",
       };
 
-      expect(review.scores["Response A"]?.correctness).toBe(4);
+      expect(review.scores[0]?.correctness).toBe(4);
       expect(review.issues).toHaveLength(1);
       expect(review.disagreements[0]?.topic).toBe("Database choice");
       expect(review.disagreements[0]?.a.response_id).toBe("Response A");
       expect(review.disagreements[0]?.b.quote).toBe("Use SQLite");
       expect(review.missing_info[0]).toBe("No mention of backup strategy");
       expect(review.confidence).toBe(0.85);
-      expect(review.notes).toBeUndefined();
+      expect(review.notes).toBe("");
     });
 
-    it("should allow optional fields", () => {
+    it("should accept notes and suggested_resolution values", () => {
       const review: CrossReview = {
-        scores: {},
+        scores: [],
         issues: [],
         disagreements: [
           {

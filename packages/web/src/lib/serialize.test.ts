@@ -17,7 +17,7 @@ function makeWorkflowResult(overrides?: Partial<WorkflowResult>): WorkflowResult
         ["openai", { status: "failed" as const, error: "timeout" }],
       ]),
       reviews: new Map([
-        ["anthropic", { status: "success" as const, review: { scores: {}, issues: [], disagreements: [], missing_info: [], confidence: 0.8, confidence_reason: "test" } }],
+        ["anthropic", { status: "success" as const, review: { scores: [], issues: [], disagreements: [], missing_info: [], confidence: 0.8, confidence_reason: "test", notes: "" } }],
       ]),
       synthesis: {
         output: "Synthesized",
@@ -37,7 +37,7 @@ function makeWorkflowResult(overrides?: Partial<WorkflowResult>): WorkflowResult
         ["anthropic", { status: "success" as const, response: { content: "Draft A", model: "claude", tokensIn: 10, tokensOut: 20, durationMs: 100 } }],
       ]),
       reviews: new Map([
-        ["anthropic", { status: "success" as const, review: { scores: {}, issues: [], disagreements: [], missing_info: [], confidence: 0.8, confidence_reason: "test" } }],
+        ["anthropic", { status: "success" as const, review: { scores: [], issues: [], disagreements: [], missing_info: [], confidence: 0.8, confidence_reason: "test", notes: "" } }],
       ]),
       synthesis: { output: "Synthesized", resolved_disagreements: [], open_questions: [], action_items: [], confidence: 0.9, confidence_reason: "good" },
       mapping: new Map([["Response A", "anthropic"]]),
