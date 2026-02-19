@@ -22,7 +22,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@llmtium/core": "workspace:*"
+    "@llmtium/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "vitest": "^3.2.0"
