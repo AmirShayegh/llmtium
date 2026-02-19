@@ -110,6 +110,27 @@ async function draft(
   }
 }
 
+function buildForcedToolParams(
+  model: string,
+  request: StructuredRequest,
+  userContent: string,
+) {
+  return {
+    model,
+    max_tokens: MAX_TOKENS,
+    system: request.systemPrompt,
+    messages: [{ role: "user" as const, content: userContent }],
+    tools: [
+      {
+        name: request.toolName,
+        description: request.toolDescription,
+        input_schema: request.schema as Anthropic.Tool.InputSchema,
+      },
+    ],
+    tool_choice: { type: "tool" as const, name: request.toolName },
+  };
+}
+
 async function structuredOutput<T>(
   config: ProviderConfig,
   request: StructuredRequest,
@@ -148,47 +169,13 @@ async function structuredOutput<T>(
               tool_choice: { type: "auto" as const },
               ...(thinkingParam ? { thinking: thinkingParam } : {}),
             })
-          : client.messages.create({
-              model,
-              max_tokens: MAX_TOKENS,
-              system: request.systemPrompt,
-              messages: [{ role: "user", content: userContent }],
-              tools: [
-                {
-                  name: request.toolName,
-                  description: request.toolDescription,
-                  input_schema:
-                    request.schema as Anthropic.Tool.InputSchema,
-                },
-              ],
-              tool_choice: {
-                type: "tool" as const,
-                name: request.toolName,
-              },
-            }),
+          : client.messages.create(buildForcedToolParams(model, request, userContent)),
       );
     } catch (error) {
       if (useThinking && isThinkingRejection(error, ANTHROPIC_THINKING_PATTERN)) {
         useThinking = false;
         response = await withTransientRetry(() =>
-          client.messages.create({
-            model,
-            max_tokens: MAX_TOKENS,
-            system: request.systemPrompt,
-            messages: [{ role: "user", content: userContent }],
-            tools: [
-              {
-                name: request.toolName,
-                description: request.toolDescription,
-                input_schema:
-                  request.schema as Anthropic.Tool.InputSchema,
-              },
-            ],
-            tool_choice: {
-              type: "tool" as const,
-              name: request.toolName,
-            },
-          }),
+          client.messages.create(buildForcedToolParams(model, request, userContent)),
         );
       } else {
         throw new Error(formatError(error));

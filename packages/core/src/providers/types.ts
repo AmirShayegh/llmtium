@@ -14,6 +14,12 @@ export interface DraftRequest {
   systemPrompt?: string;
 }
 
+/**
+ * Response from a draft generation call.
+ *
+ * Note: tokensIn/tokensOut reflect the provider's reported usage, which may not
+ * separate thinking/reasoning tokens. Thinking token cost tracking is Phase 2.
+ */
 export interface DraftResponse {
   content: string;
   model: string;
@@ -46,6 +52,10 @@ export interface Provider {
     config: ProviderConfig,
     request: StructuredRequest,
   ): Promise<ProviderResult<T>>;
+  /**
+   * Minimal API call to verify the key works. Not wrapped in transient retry —
+   * validation should be fast and a transient failure is informative.
+   */
   validateKey(
     config: ProviderConfig,
   ): Promise<ProviderResult<boolean>>;

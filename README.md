@@ -4,7 +4,7 @@ Multi-LLM deliberation, cross-referencing, and synthesis. Send your prompt to Cl
 
 **BYOK (Bring Your Own Keys) -- Self-hostable -- Open Source (MIT)**
 
-> LLMtium is in early development (v0.1.0). The core pipeline works. Rough edges exist.
+> LLMtium is in early development (v0.0.1). The core pipeline works. Rough edges exist.
 
 ---
 

@@ -208,6 +208,34 @@ describe("sanitizeReview", () => {
     const review = makeReview({ scores: [], issues: [], disagreements: [], missing_info: ["No backup plan"] });
     expect(() => sanitizeReview(review)).not.toThrow();
   });
+
+  it("should coerce NaN score to fallback", () => {
+    const review = makeReview({
+      scores: [{ response_id: "A", correctness: NaN, completeness: 3, actionability: 5, clarity: 4 }],
+    });
+    const result = sanitizeReview(review);
+    expect(result.scores[0]!.correctness).toBe(3);
+  });
+
+  it("should coerce Infinity score to fallback", () => {
+    const review = makeReview({
+      scores: [{ response_id: "A", correctness: Infinity, completeness: 3, actionability: 5, clarity: 4 }],
+    });
+    const result = sanitizeReview(review);
+    expect(result.scores[0]!.correctness).toBe(3);
+  });
+
+  it("should coerce NaN confidence to fallback", () => {
+    const review = makeReview({ confidence: NaN });
+    const result = sanitizeReview(review);
+    expect(result.confidence).toBe(0.5);
+  });
+
+  it("should coerce -Infinity confidence to fallback", () => {
+    const review = makeReview({ confidence: -Infinity });
+    const result = sanitizeReview(review);
+    expect(result.confidence).toBe(0.5);
+  });
 });
 
 describe("sanitizeSynthesis", () => {
@@ -298,5 +326,17 @@ describe("sanitizeSynthesis", () => {
     expect(result.resolved_disagreements[0]!.topic).toBe("T");
     expect(result.action_items).toHaveLength(1);
     expect(result.action_items[0]!.item).toBe("Do it");
+  });
+
+  it("should coerce NaN confidence to fallback", () => {
+    const synthesis = makeSynthesis({ confidence: NaN });
+    const result = sanitizeSynthesis(synthesis);
+    expect(result.confidence).toBe(0.5);
+  });
+
+  it("should coerce Infinity confidence to fallback", () => {
+    const synthesis = makeSynthesis({ confidence: Infinity });
+    const result = sanitizeSynthesis(synthesis);
+    expect(result.confidence).toBe(0.5);
   });
 });

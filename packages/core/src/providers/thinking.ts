@@ -116,6 +116,10 @@ export function isThinkingRejection(
  *
  * Should wrap OUTSIDE `withTransientRetry` so each branch gets its own
  * transient retry protection.
+ *
+ * Note: `durationMs` in the returned response reflects wall-clock time from
+ * the original `start` timestamp, so it includes the failed thinking attempt
+ * if fallback was triggered.
  */
 export async function withThinkingFallback<T>(
   thinkingEnabled: boolean,

@@ -97,4 +97,39 @@ describe("exportToJson", () => {
     expect(parsed.pipeline.synthesis).toBeDefined();
     expect(parsed.pipeline.telemetry).toBeDefined();
   });
+
+  it("should preserve partial status in pipeline", () => {
+    const fixture = makeFixture();
+    fixture.result.pipeline.status = "partial";
+    const json = exportToJson(fixture);
+    const parsed = JSON.parse(json);
+    expect(parsed.pipeline.status).toBe("partial");
+  });
+
+  it("should handle null synthesis in pipeline", () => {
+    const fixture = makeFixture();
+    fixture.result.pipeline.synthesis = null;
+    fixture.synthesis = null as unknown as typeof fixture.synthesis;
+    const json = exportToJson(fixture);
+    const parsed = JSON.parse(json);
+    expect(parsed.pipeline.synthesis).toBeNull();
+  });
+
+  it("should include errors array from pipeline", () => {
+    const fixture = makeFixture();
+    fixture.result.pipeline.errors = [{ stage: "draft", model: "google", error: "timeout" }];
+    const json = exportToJson(fixture);
+    const parsed = JSON.parse(json);
+    expect(parsed.pipeline.errors).toHaveLength(1);
+    expect(parsed.pipeline.errors[0].model).toBe("google");
+  });
+
+  it("should produce valid JSON with empty drafts", () => {
+    const fixture = makeFixture();
+    fixture.result.pipeline.drafts = {};
+    fixture.drafts = {};
+    const json = exportToJson(fixture);
+    const parsed = JSON.parse(json);
+    expect(parsed.pipeline.drafts).toEqual({});
+  });
 });

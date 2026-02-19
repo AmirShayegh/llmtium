@@ -81,6 +81,57 @@ describe("serializeWorkflowResult", () => {
     expect(parsed.stages.mapping["Response A"]).toBe("anthropic");
   });
 
+  it("should serialize empty Maps to empty objects", () => {
+    const result = makeWorkflowResult({
+      stages: {
+        drafts: new Map(),
+        reviews: new Map(),
+        synthesis: { output: "S", resolved_disagreements: [], open_questions: [], action_items: [], confidence: 0.9, confidence_reason: "ok" },
+        mapping: new Map(),
+      },
+      pipeline: {
+        status: "success",
+        drafts: new Map(),
+        reviews: new Map(),
+        synthesis: { output: "S", resolved_disagreements: [], open_questions: [], action_items: [], confidence: 0.9, confidence_reason: "ok" },
+        mapping: new Map(),
+        errors: [],
+        telemetry: { totalDurationMs: 100, stageDurationMs: { draft: 50, review: 30, synthesis: 20 }, draftTokens: {} },
+      },
+    });
+
+    const serialized = serializeWorkflowResult(result);
+    expect(serialized.stages.drafts).toEqual({});
+    expect(serialized.stages.reviews).toEqual({});
+    expect(serialized.stages.mapping).toEqual({});
+    expect(serialized.pipeline.drafts).toEqual({});
+    expect(serialized.pipeline.reviews).toEqual({});
+  });
+
+  it("should preserve pipeline error details", () => {
+    const result = makeWorkflowResult({
+      errors: [{ stage: "draft", model: "google", error: "timeout" }],
+      pipeline: {
+        status: "partial",
+        drafts: new Map(),
+        reviews: new Map(),
+        synthesis: null,
+        mapping: null,
+        errors: [
+          { stage: "draft", model: "google", error: "timeout" },
+          { stage: "review", model: "openai", error: "rate limit" },
+        ],
+        telemetry: { totalDurationMs: 0, stageDurationMs: { draft: 0, review: 0, synthesis: 0 }, draftTokens: {} },
+      },
+    });
+
+    const serialized = serializeWorkflowResult(result);
+    expect(serialized.errors).toHaveLength(1);
+    expect(serialized.errors[0]!.stage).toBe("draft");
+    expect(serialized.pipeline.errors).toHaveLength(2);
+    expect(serialized.pipeline.errors[1]!.model).toBe("openai");
+  });
+
   it("should handle null synthesis and null mapping", () => {
     const result = makeWorkflowResult({
       stages: {

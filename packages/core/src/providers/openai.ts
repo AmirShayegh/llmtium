@@ -214,6 +214,8 @@ async function structuredOutput<T>(
       }
     }
 
+    // Cast: SDK return type is ChatCompletion | Stream<ChatCompletionChunk>
+    // but we don't pass stream: true, so the result is always ChatCompletion.
     const content = (response as OpenAI.ChatCompletion).choices[0]?.message
       ?.content;
     // Null/empty content is a malformed response — return empty to trigger retry
