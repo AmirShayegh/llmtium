@@ -31,6 +31,7 @@ async function draft(
   config: ProviderConfig,
   request: DraftRequest,
 ): Promise<ProviderResult<DraftResponse>> {
+  const start = Date.now();
   try {
     const client = createClient(config.apiKey);
     const model = config.model ?? DEFAULT_MODEL;
@@ -41,7 +42,6 @@ async function draft(
     messages.push({ role: "user", content: request.userPrompt });
 
     const data = await withTransientRetry(async () => {
-      const start = Date.now();
       const stream = await client.chat.completions.create({
         model,
         messages,

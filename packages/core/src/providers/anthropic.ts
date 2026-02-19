@@ -31,12 +31,12 @@ async function draft(
   config: ProviderConfig,
   request: DraftRequest,
 ): Promise<ProviderResult<DraftResponse>> {
+  const start = Date.now();
   try {
     const client = createClient(config.apiKey);
     const model = config.model ?? DEFAULT_MODEL;
 
     const data = await withTransientRetry(async () => {
-      const start = Date.now();
       const stream = client.messages.stream({
         model,
         max_tokens: MAX_TOKENS,

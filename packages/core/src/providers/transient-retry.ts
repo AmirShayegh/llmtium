@@ -10,7 +10,7 @@ const defaultDelay: DelayFn = (ms) =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
 export function isTransientError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
+  if (error == null || typeof error !== "object") return false;
 
   // 1. Node.js error codes (most reliable for connection errors)
   if (
@@ -22,12 +22,23 @@ export function isTransientError(error: unknown): boolean {
   }
 
   // 2. SDK error class names (Anthropic/OpenAI APIConnectionError)
-  if (error.name.includes("ConnectionError")) return true;
+  if (
+    "name" in error &&
+    typeof (error as { name: unknown }).name === "string" &&
+    (error as { name: string }).name.includes("ConnectionError")
+  ) {
+    return true;
+  }
 
   // 3. Connection error patterns in message (Google SDK fallback)
-  const msg = error.message;
-  for (const pattern of CONNECTION_ERROR_CODES) {
-    if (msg.includes(pattern)) return true;
+  if (
+    "message" in error &&
+    typeof (error as { message: unknown }).message === "string"
+  ) {
+    const msg = (error as { message: string }).message;
+    for (const pattern of CONNECTION_ERROR_CODES) {
+      if (msg.includes(pattern)) return true;
+    }
   }
 
   // 4. HTTP status codes via duck typing

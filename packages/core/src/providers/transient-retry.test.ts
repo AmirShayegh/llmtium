@@ -89,6 +89,15 @@ describe("isTransientError", () => {
     expect(isTransientError(undefined)).toBe(false);
   });
 
+  it("should return true for plain object with transient status", () => {
+    expect(isTransientError({ status: 503 })).toBe(true);
+    expect(isTransientError({ status: 429 })).toBe(true);
+  });
+
+  it("should return false for plain object with non-transient status", () => {
+    expect(isTransientError({ status: 400 })).toBe(false);
+  });
+
   it("should return true for connection error with status undefined (Google SDK pattern)", () => {
     const error = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:443"), { status: undefined });
     expect(isTransientError(error)).toBe(true);

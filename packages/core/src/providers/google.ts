@@ -51,12 +51,12 @@ async function draft(
   config: ProviderConfig,
   request: DraftRequest,
 ): Promise<ProviderResult<DraftResponse>> {
+  const start = Date.now();
   try {
     const ai = new GoogleGenAI({ apiKey: config.apiKey });
     const modelName = config.model ?? DEFAULT_MODEL;
 
     const data = await withTransientRetry(async () => {
-      const start = Date.now();
       const response = await ai.models.generateContentStream({
         model: modelName,
         contents: request.userPrompt,
