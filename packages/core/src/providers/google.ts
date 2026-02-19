@@ -9,7 +9,7 @@ import type {
 } from "./types.js";
 import { withStructuredRetry } from "./structured-retry.js";
 
-const DEFAULT_MODEL = "gemini-2.0-flash";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 
 function formatError(error: unknown): string {
   if (!(error instanceof Error)) return String(error);

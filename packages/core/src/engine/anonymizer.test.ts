@@ -5,7 +5,7 @@ import type { AnonymizedResponse } from "../types/index.js";
 const threeModels = new Map([
   ["anthropic/claude-sonnet-4.5", "Anthropic draft content"],
   ["openai/gpt-5.2", "OpenAI draft content"],
-  ["google/gemini-2.0-flash", "Google draft content"],
+  ["google/gemini-2.5-flash", "Google draft content"],
 ]);
 
 describe("anonymizer", () => {

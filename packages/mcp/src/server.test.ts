@@ -17,7 +17,7 @@ vi.mock("@llmtium/core", () => ({
     validateKey: vi.fn(),
   },
   googleProvider: {
-    meta: { id: "google", name: "Google", defaultModel: "gemini-2.0-flash" },
+    meta: { id: "google", name: "Google", defaultModel: "gemini-2.5-flash" },
     draft: vi.fn(),
     structuredOutput: vi.fn(),
     validateKey: vi.fn(),

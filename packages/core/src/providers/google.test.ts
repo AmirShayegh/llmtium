@@ -63,7 +63,7 @@ describe("googleProvider", () => {
     it("should have correct id, name, and defaultModel", () => {
       expect(provider.googleProvider.meta.id).toBe("google");
       expect(provider.googleProvider.meta.name).toBe("Google");
-      expect(provider.googleProvider.meta.defaultModel).toBe("gemini-2.0-flash");
+      expect(provider.googleProvider.meta.defaultModel).toBe("gemini-2.5-flash");
     });
   });
 
@@ -83,7 +83,7 @@ describe("googleProvider", () => {
         expect(result.data.content).toBe("Hello world");
         expect(result.data.tokensIn).toBe(6);
         expect(result.data.tokensOut).toBe(3);
-        expect(result.data.model).toBe("gemini-2.0-flash");
+        expect(result.data.model).toBe("gemini-2.5-flash");
         expect(result.data.durationMs).toBeGreaterThanOrEqual(0);
       }
     });
