@@ -9,7 +9,7 @@ import type {
 } from "./types.js";
 import { withStructuredRetry } from "./structured-retry.js";
 
-const DEFAULT_MODEL = "gpt-4o";
+const DEFAULT_MODEL = "gpt-5.2";
 
 function createClient(apiKey: string): OpenAI {
   return new OpenAI({ apiKey });

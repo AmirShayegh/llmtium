@@ -4,7 +4,7 @@ import type { AnonymizedResponse } from "../types/index.js";
 
 const threeModels = new Map([
   ["anthropic/claude-sonnet-4.5", "Anthropic draft content"],
-  ["openai/gpt-4o", "OpenAI draft content"],
+  ["openai/gpt-5.2", "OpenAI draft content"],
   ["google/gemini-2.0-flash", "Google draft content"],
 ]);
 
@@ -136,12 +136,12 @@ describe("anonymizer", () => {
   describe("deanonymize", () => {
     const mapping = new Map([
       ["Response A", "anthropic/claude-sonnet-4.5"],
-      ["Response B", "openai/gpt-4o"],
+      ["Response B", "openai/gpt-5.2"],
     ]);
 
     it("should return the original model ID for a known label", () => {
       expect(deanonymize("Response A", mapping)).toBe("anthropic/claude-sonnet-4.5");
-      expect(deanonymize("Response B", mapping)).toBe("openai/gpt-4o");
+      expect(deanonymize("Response B", mapping)).toBe("openai/gpt-5.2");
     });
 
     it("should return the label itself for an unknown label", () => {

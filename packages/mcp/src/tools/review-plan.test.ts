@@ -11,13 +11,13 @@ import type {
 vi.mock("@llmtium/core", () => ({
   reviewPlan: vi.fn(),
   anthropicProvider: {
-    meta: { id: "anthropic", name: "Anthropic", defaultModel: "claude-sonnet-4-20250514" },
+    meta: { id: "anthropic", name: "Anthropic", defaultModel: "claude-opus-4-6" },
     draft: vi.fn(),
     structuredOutput: vi.fn(),
     validateKey: vi.fn(),
   },
   openaiProvider: {
-    meta: { id: "openai", name: "OpenAI", defaultModel: "gpt-4o" },
+    meta: { id: "openai", name: "OpenAI", defaultModel: "gpt-5.2" },
     draft: vi.fn(),
     structuredOutput: vi.fn(),
     validateKey: vi.fn(),

@@ -80,7 +80,7 @@ describe("anthropicProvider", () => {
     it("should have correct id, name, and defaultModel", () => {
       expect(provider.anthropicProvider.meta.id).toBe("anthropic");
       expect(provider.anthropicProvider.meta.name).toBe("Anthropic");
-      expect(provider.anthropicProvider.meta.defaultModel).toBe("claude-sonnet-4-20250514");
+      expect(provider.anthropicProvider.meta.defaultModel).toBe("claude-opus-4-6");
     });
   });
 
@@ -98,7 +98,7 @@ describe("anthropicProvider", () => {
         expect(result.data.content).toBe("Hello world");
         expect(result.data.tokensIn).toBe(10);
         expect(result.data.tokensOut).toBe(5);
-        expect(result.data.model).toBe("claude-sonnet-4-20250514");
+        expect(result.data.model).toBe("claude-opus-4-6");
         expect(result.data.durationMs).toBeGreaterThanOrEqual(0);
       }
     });

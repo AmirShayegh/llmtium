@@ -79,7 +79,7 @@ describe("openaiProvider", () => {
     it("should have correct id, name, and defaultModel", () => {
       expect(provider.openaiProvider.meta.id).toBe("openai");
       expect(provider.openaiProvider.meta.name).toBe("OpenAI");
-      expect(provider.openaiProvider.meta.defaultModel).toBe("gpt-4o");
+      expect(provider.openaiProvider.meta.defaultModel).toBe("gpt-5.2");
     });
   });
 
@@ -99,7 +99,7 @@ describe("openaiProvider", () => {
         expect(result.data.content).toBe("Hello world");
         expect(result.data.tokensIn).toBe(8);
         expect(result.data.tokensOut).toBe(4);
-        expect(result.data.model).toBe("gpt-4o");
+        expect(result.data.model).toBe("gpt-5.2");
         expect(result.data.durationMs).toBeGreaterThanOrEqual(0);
       }
     });
@@ -211,7 +211,7 @@ describe("openaiProvider", () => {
 
   describe("validateKey", () => {
     it("should return success true for valid key", async () => {
-      mockModelsList.mockResolvedValue({ data: [{ id: "gpt-4o" }] });
+      mockModelsList.mockResolvedValue({ data: [{ id: "gpt-5.2" }] });
 
       const result = await provider.openaiProvider.validateKey(config);
 

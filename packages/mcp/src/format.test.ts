@@ -59,7 +59,7 @@ function makePipelineResult(overrides?: Partial<PipelineResult>): PipelineResult
     status: "success",
     drafts: new Map([
       ["anthropic", { status: "success" as const, response: makeDraftResponse() }],
-      ["openai", { status: "success" as const, response: makeDraftResponse({ model: "gpt-4o" }) }],
+      ["openai", { status: "success" as const, response: makeDraftResponse({ model: "gpt-5.2" }) }],
     ]),
     reviews: new Map([
       ["anthropic", { status: "success" as const, review: makeReview() }],

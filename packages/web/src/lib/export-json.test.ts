@@ -35,7 +35,7 @@ function makeFixture(): ExportData {
       synthesizer: "anthropic",
     },
     stages: {
-      drafts: { anthropic: { content: "Draft A", model: "claude-sonnet-4-20250514", tokensIn: 100, tokensOut: 200, durationMs: 1000 } },
+      drafts: { anthropic: { content: "Draft A", model: "claude-opus-4-6", tokensIn: 100, tokensOut: 200, durationMs: 1000 } },
       reviews: { anthropic: review },
       synthesis,
       mapping: { "Response A": "anthropic", "Response B": "openai" },
