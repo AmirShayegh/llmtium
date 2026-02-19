@@ -58,13 +58,13 @@ describe("createServer", () => {
     expect(call).toBeDefined();
 
     const config = call![1] as Record<string, unknown>;
-    const schema = config.inputSchema as Record<string, unknown>;
+    const schema = config.inputSchema as Record<string, { isOptional: () => boolean }>;
 
-    // plan must be present
-    expect(schema).toHaveProperty("plan");
-    // optional fields must be present
-    expect(schema).toHaveProperty("context");
-    expect(schema).toHaveProperty("models");
-    expect(schema).toHaveProperty("synthesizer");
+    // plan must be required
+    expect(schema.plan.isOptional()).toBe(false);
+    // context, models, synthesizer must be optional
+    expect(schema.context.isOptional()).toBe(true);
+    expect(schema.models.isOptional()).toBe(true);
+    expect(schema.synthesizer.isOptional()).toBe(true);
   });
 });
