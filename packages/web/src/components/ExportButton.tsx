@@ -13,24 +13,24 @@ import { exportToMarkdown } from "@/lib/export-markdown";
 import { downloadFile } from "@/lib/download";
 import type { ExportData } from "@/lib/export-json";
 import type { ConsortiumState } from "@/store/consortium";
-import type { SynthesisResponse } from "@llmtium/core";
 import type { StoreApi } from "zustand";
 
 interface ExportButtonProps {
   store: StoreApi<ConsortiumState>;
 }
 
-function buildExportData(state: ConsortiumState): ExportData {
+function buildExportData(state: ConsortiumState): ExportData | null {
+  if (state.runStatus !== "complete" || !state.result || !state.synthesis) return null;
   return {
     prompt: state.prompt,
     models: state.models,
     synthesizer: state.synthesizer,
     drafts: state.drafts,
     reviews: state.reviews,
-    synthesis: state.synthesis as SynthesisResponse,
+    synthesis: state.synthesis,
     mapping: state.mapping,
-    result: state.result!,
-    errors: state.errors,
+    result: state.result,
+    errors: state.result.pipeline.errors,
   };
 }
 
@@ -42,12 +42,14 @@ export function ExportButton({ store }: ExportButtonProps) {
 
   const handleJsonExport = () => {
     const data = buildExportData(store.getState());
+    if (!data) return;
     const json = exportToJson(data);
     downloadFile("llmtium-export.json", json, "application/json");
   };
 
   const handleMarkdownExport = () => {
     const data = buildExportData(store.getState());
+    if (!data) return;
     const md = exportToMarkdown(data);
     downloadFile("llmtium-export.md", md, "text/markdown");
   };
