@@ -31,3 +31,8 @@ coverage/
 # Misc
 *.tsbuildinfo
 *.log
+
+# Internal docs (local only)
+docs/
+CLAUDE-RULES.md
+CLAUDE.md
