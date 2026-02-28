@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useStore } from "zustand";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConsortiumInput } from "@/components/ConsortiumInput";
+import { HeroSection } from "@/components/HeroSection";
 import { StageProgress } from "@/components/StageProgress";
 import { ResponseTabs } from "@/components/ResponseTabs";
 import { ReviewDisplay } from "@/components/ReviewDisplay";
@@ -55,6 +56,7 @@ export function ConsortiumPage() {
 
   return (
     <div className="space-y-6">
+      {runStatus === "idle" && <HeroSection />}
       <ConsortiumInput store={consortiumStore} />
       <StageProgress store={consortiumStore} />
 
