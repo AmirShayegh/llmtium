@@ -121,7 +121,7 @@ export function ConsortiumInput({ store }: ConsortiumInputProps) {
         disabled={isRunning}
         className="min-h-[160px] max-h-[400px] resize-y overflow-y-auto font-mono text-sm"
       />
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           {Object.entries(PROVIDER_META).map(([id, meta]) => {
             const configured = configuredIds.includes(id);
